@@ -167,14 +167,7 @@ class ProjectManager(CoreComponent):
 
         # get block from git
         result = self._get_subprocess_return(
-            self._subprocess_call("git clone {0}".format(url)),
-            "cloning block")
-
-        if result["status"] == "ok":
-            result = self._get_subprocess_return(
-                self._subprocess_call("git submodule update --init "
-                                      "--recursive"),
-                "updating submodules")
+            self._subprocess_call("git clone --recursive  {0}".format(url)), "cloning block")
 
         return result
 
