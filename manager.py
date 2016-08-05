@@ -14,6 +14,9 @@ from nio import discoverable
 
 from .handler import ProjectManagerHandler
 
+import pip
+import os.path
+
 
 @DependsOn("niocore.components.rest", "0.1.0")
 @discoverable
@@ -165,11 +168,54 @@ class ProjectManager(CoreComponent):
             self.logger.error("Path '{0}' is invalid".format(path_to_block))
             raise
 
-        # get block from git
-        result = self._get_subprocess_return(
-            self._subprocess_call("git clone --recursive  {0}".format(url)), "cloning block")
+        # Log
+        self.logger.info("Cloning Git repository: {0}".format(url))
+
+        # Get block from git
+        res = self._subprocess_call("git clone --recursive  {0}".format(url))
+
+        # Get the directory that this was cloned into
+        block_dir, block_dir_ext = os.path.splitext(os.path.basename(url))
+
+        # Log
+        self.logger.info("Cloning Git repository into directory: {0}".format(block_dir))
+
+        # Update pip requirements
+        if res == 0:
+            self.pip_install_req("{0}/{1}".format(path_to_block, block_dir))
+
+
+        # Get process return
+        result = self._get_subprocess_return(res, "cloning block")
 
         return result
+
+    def pip_install_req(self, path_to_block):
+        """ Updates PIP requirements.txt file for a block
+
+        Args:
+            path_to_block: If None, path is figured out by accessing "blocks" entry from environment configuration
+
+        Returns:
+            Operation True or False
+        """
+
+        # Make path to requirements
+        path_req = "{0}/requirements.txt".format(path_to_block)
+
+        # Log
+        self.logger.info("Install PIP requirements at {0}".format(path_req))
+
+        # If we do not have a file, we are good
+        if not os.path.isfile(path_req):
+            return True
+
+        # Pip install
+        res = pip.main(['install', '-r', path_req])
+        if res != 0:
+            return False
+
+        return True
 
     def update_block(self, blocks):
         """ Pulls down block latest version and updates submodules
@@ -199,17 +245,13 @@ class ProjectManager(CoreComponent):
                     chdir(blocks_path)
 
                 # update block
-                result = self._get_subprocess_return(
-                    self._subprocess_call(
-                        "git fetch origin --progress --prune"),
-                    "updating block")
+                result = self._get_subprocess_return(self._subprocess_call("git fetch origin --progress --prune"), "updating block")
                 results.append({block_structure["name"]: result})
                 updates_in_path = True
 
             # update submodules if there were any updates in path
             if updates_in_path:
-                self._subprocess_call(
-                    "git submodule update --init --recursive")
+                self._subprocess_call("git submodule update --init --recursive")
 
         if len(blocks):
             # warning about requested blocks that were not found
