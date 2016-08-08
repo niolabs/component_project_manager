@@ -116,9 +116,6 @@ class ProjectManagerHandler(RESTHandler):
     def on_put(self, request, response, *args, **kwargs):
         return self.on_post(request, response, args, kwargs)
 
-    def on_options(self, req, resp):
-        resp.set_status(200)
-
     @staticmethod
     def _get_blocks(params):
         # consider url params to be block names,
