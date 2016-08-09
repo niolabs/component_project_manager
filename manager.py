@@ -77,7 +77,11 @@ class ProjectManager(CoreComponent):
         super().stop()
 
     def get_blocks_structure(self):
-        """ Return file structure under 'blocks' resource """
+        """ Get block structure from disk
+
+        Returns:
+           Structure with an Array of blocks
+        """
         blocks = []
         blocks_paths = self._get_abs_blocks_paths()
         for blocks_path in blocks_paths:
@@ -97,7 +101,35 @@ class ProjectManager(CoreComponent):
 
         return {"blocks": blocks}
 
+    def _get_blocks(params):
+        """ Get blocks from params
+
+        Consider url params to be block names, discard actual url param values
+
+        Returns:
+           Array of blocks
+
+        """
+
+        blocks = []
+        for key, _ in params.items():
+            blocks.extend([block.strip() for block in key.split(",")])
+
+        return blocks
+
+
     def remove_blocks(self, blocks):
+        """Remove blocks from disk
+
+        Args:
+            block: block folder
+
+        Returns:
+           Array of removed blocks
+
+        """
+
+
         blocks_paths = self._get_abs_blocks_paths()
         removed = []
         for blocks_path in blocks_paths:
@@ -165,11 +197,10 @@ class ProjectManager(CoreComponent):
             self.logger.error("Path '{0}' is invalid".format(path_to_block))
             raise
 
-        # get block from git
+        # Get block from git
         result = self._get_subprocess_return(
             self._subprocess_call("git clone {0}".format(url)),
             "cloning block")
-
         if result["status"] == "ok":
             result = self._get_subprocess_return(
                 self._subprocess_call("git submodule update --init "

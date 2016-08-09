@@ -19,7 +19,7 @@ class ProjectManagerHandler(RESTHandler):
 
     @protected_access("project.view")
     def on_get(self, request, response, *args, **kwargs):
-        """ API endpoint to retrieve current block structure.
+        """ API endpoint to retrieve current block structure
 
         Example:
             http://[host]:[port]/project/blocks
@@ -57,7 +57,7 @@ class ProjectManagerHandler(RESTHandler):
                 del params["identifier"]
                 # consider url params to be block names,
                 # discard actual url param values
-                blocks = self._get_blocks(params)
+                blocks = self._project_manager._get_blocks(params)
                 if blocks:
                     result = self._project_manager.remove_blocks(blocks)
 
@@ -70,8 +70,7 @@ class ProjectManagerHandler(RESTHandler):
 
     @protected_access("project.modify")
     def on_post(self, request, response, *args, **kwargs):
-        """ API endpoint to handle 'clone' and/or 'update' repository
-        operations
+        """ API endpoint to handle 'clone' and/or 'update' repository operations
 
         Example:
             clone:
@@ -103,7 +102,7 @@ class ProjectManagerHandler(RESTHandler):
                     # []/project/blocks?twitter&util or
                     # []/project/blocks?twitter,util
                     del params["identifier"]
-                    blocks = self._get_blocks(params)
+                    blocks = self._project_manager._get_blocks(params)
                     result = self._project_manager.update_block(blocks)
 
         if result is not None:
@@ -115,14 +114,9 @@ class ProjectManagerHandler(RESTHandler):
 
     @protected_access("project.modify")
     def on_put(self, request, response, *args, **kwargs):
+        """ API endpoint to handle 'clone' and/or 'update' repository operations
+
+        Passes along to on_post handler.
+        """
+
         return self.on_post(request, response, args, kwargs)
-
-    @staticmethod
-    def _get_blocks(params):
-        # consider url params to be block names,
-        # discard actual url param values
-        blocks = []
-        for key, _ in params.items():
-            blocks.extend([block.strip() for block in key.split(",")])
-
-        return blocks
