@@ -109,40 +109,34 @@ class TestProjectManager(NIOCoreTestCase):
         subprocess_patch.call = Mock(return_value=0)
 
         project_manager = ProjectManager()
-        url = "block_name"
+        url = "block_template"
         result = project_manager.clone_block(url, None)
 
         self.assertEqual(result["status"], "ok")
         # two subprocess calls, first to clone, second to update submodules
         subprocess_patch.call.assert_any_call(
-            "git clone git@github.com:nio-blocks/block_name.git", shell=True)
-        subprocess_patch.call.assert_any_call(
-            "git submodule update --init --recursive", shell=True)
+            "git clone --recursive git@github.com:nio-blocks/block_template.git", shell=True)
         subprocess_patch.call.reset_mock()
 
         # assert that chdir call happened
         chdir_patch.assert_called_once_with(path.join(self._root_path,
                                                       "blocks"))
 
-        url = "nio-blocks/block_name"
+        url = "nio-blocks/block_template"
         result = project_manager.clone_block(url, None)
 
         self.assertEqual(result["status"], "ok")
         subprocess_patch.call.assert_any_call(
-            "git clone git@github.com:nio-blocks/block_name.git", shell=True)
-        subprocess_patch.call.assert_any_call(
-            "git submodule update --init --recursive", shell=True)
+            "git clone --recursive git@github.com:nio-blocks/block_template.git", shell=True)
         subprocess_patch.call.reset_mock()
 
         # full url
-        url = "git@github.com:nio-blocks/block_name"
+        url = "git@github.com:nio-blocks/block_template"
         result = project_manager.clone_block(url, None)
 
         self.assertEqual(result["status"], "ok")
         subprocess_patch.call.assert_any_call(
-            "git clone git@github.com:nio-blocks/block_name.git", shell=True)
-        subprocess_patch.call.assert_any_call(
-            "git submodule update --init --recursive", shell=True)
+            "git clone --recursive git@github.com:nio-blocks/block_template.git", shell=True)
         subprocess_patch.call.reset_mock()
 
         # another full url format
@@ -151,9 +145,7 @@ class TestProjectManager(NIOCoreTestCase):
 
         self.assertEqual(result["status"], "ok")
         subprocess_patch.call.assert_any_call(
-            "git clone https://github.com/nio-blocks/util.git", shell=True)
-        subprocess_patch.call.assert_any_call(
-            "git submodule update --init --recursive", shell=True)
+            "git clone --recursive https://github.com/nio-blocks/util.git", shell=True)
         subprocess_patch.call.reset_mock()
 
     @patch(ProjectManager.__module__ + ".subprocess")
@@ -163,13 +155,13 @@ class TestProjectManager(NIOCoreTestCase):
 
         project_manager = ProjectManager()
 
-        url = "block_name"
+        url = "block_template"
         result = project_manager.clone_block(url, None)
         self.assertNotEqual(result["status"], "ok")
 
         # since this call fails, there is only one subprocess call
         subprocess_patch.call.assert_called_once_with(
-            "git clone git@github.com:nio-blocks/block_name.git", shell=True)
+            "git clone --recursive git@github.com:nio-blocks/block_template.git", shell=True)
         subprocess_patch.call.reset_mock()
 
     def test_update_block_ok(self):
@@ -188,9 +180,6 @@ class TestProjectManager(NIOCoreTestCase):
         project_manager._subprocess_call.assert_any_call(
             "git fetch origin --progress --prune")
 
-        # assert update submodule call arguments
-        project_manager._subprocess_call.assert_any_call(
-            "git submodule update --init --recursive")
 
     def test_update_invalid_block(self):
 
@@ -223,7 +212,3 @@ class TestProjectManager(NIOCoreTestCase):
         # assert fetch call arguments
         project_manager._subprocess_call.assert_any_call(
             "git fetch origin --progress --prune")
-
-        # assert update submodule call arguments
-        project_manager._subprocess_call.assert_any_call(
-            "git submodule update --init --recursive")

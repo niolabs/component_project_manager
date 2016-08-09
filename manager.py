@@ -28,7 +28,7 @@ class ProjectManager(CoreComponent):
 
     _name = "ProjectManager"
 
-    exclusions = ["__pycache__", ".git", "__init__.py", "README.md"]
+    exclusions = ["__pycache__", ".git", "__init__.py", "README.md", ".DS_Store"]
 
     def __init__(self):
         """ Initializes the component
@@ -172,7 +172,7 @@ class ProjectManager(CoreComponent):
         self.logger.info("Cloning Git repository: {0}".format(url))
 
         # Get block from git
-        res = self._subprocess_call("git clone --recursive  {0}".format(url))
+        res = self._subprocess_call("git clone --recursive {0}".format(url))
 
         # Get the directory that this was cloned into
         block_dir, block_dir_ext = os.path.splitext(os.path.basename(url))
