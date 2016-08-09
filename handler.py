@@ -95,8 +95,7 @@ class ProjectManagerHandler(RESTHandler):
                     # target path, if no path available, system will provide it
                     path_to_block = body["path"] if "path" in body else None
 
-                    result = self._project_manager.clone_block(
-                        url, path_to_block)
+                    result = self._project_manager.clone_block(url, path_to_block)
                 else:
                     # when no url is specified, then default to blocks,
                     # in which case, interpret it as block updates
