@@ -7,6 +7,7 @@ import subprocess
 from os import listdir, path, remove, chdir
 from shutil import rmtree
 
+from nio.util.logging import get_nio_logger
 from nio.util.versioning.dependency import DependsOn
 from niocore.core.component import CoreComponent
 from niocore.util.environment import NIOEnvironment
@@ -31,7 +32,7 @@ class ProjectManager(CoreComponent):
     exclusions = ["__pycache__", ".git", "__init__.py", "README.md", ".DS_Store"]
 
     def __init__(self):
-        """ Initializes the component
+        """Initializes the component
 
         """
         super().__init__()
@@ -53,10 +54,10 @@ class ProjectManager(CoreComponent):
         super().configure(context)
 
         # Register dependencies to rest and service manager
-        self._rest_manager = self.get_dependency('RESTManager')
+        self._rest_manager = self.get_dependency("RESTManager")
 
     def start(self):
-        """ Starts component
+        """Starts component
 
         Creates and registers web handler
 
@@ -70,7 +71,7 @@ class ProjectManager(CoreComponent):
         self._rest_manager.add_web_handler(self._handler)
 
     def stop(self):
-        """ Stops component
+        """Stops component
 
         Removes web handler
 
@@ -79,33 +80,76 @@ class ProjectManager(CoreComponent):
         self._rest_manager.remove_web_handler(self._handler)
         super().stop()
 
-    def get_blocks_structure(self):
+    def get_blocks_structure(self, branches = 0):
         """ Get block structure from disk
+
+        Args:
+            branches: Show git branches for each block
 
         Returns:
            Structure with an Array of blocks
         """
-        blocks = []
+
+        # Return
+        ret = []
+
+        # Blocks from path
         blocks_paths = self._get_abs_blocks_paths()
+
+        # Each block
         for blocks_path in blocks_paths:
             for item in listdir(blocks_path):
-                # discard known exclusions
+
+                # -- Discard known exclusions
                 if item in ProjectManager.exclusions:
                     continue
 
-                item_full_path = path.join(blocks_path, item)
+                # -- Make block full path
+                block_full_path = path.join(blocks_path, item)
 
-                if path.isdir(item_full_path):
-                    blocks.append({"name": item,
-                                   "type": "directory"})
-                elif path.isfile(item_full_path):
-                    blocks.append({"name": path.splitext(item)[0],
-                                   "type": "file"})
+                # -- Folder or file
+                block = None
+                if path.isdir(block_full_path):
+                    block = {"name": item, "type": "directory"}
+                elif path.isfile(block_full_path):
+                    block = {"name": path.splitext(item)[0], "type": "file"}
 
-        return {"blocks": blocks}
+                # -- Get branches
+                if branches:
+                    block["branch"] = self._get_git_branch(block_full_path)
 
-    def _get_blocks(params):
-        """ Get blocks from params
+                # -- Add block
+                if block is not None:
+                    ret.append(block)
+
+
+        return {"blocks": ret}
+
+    def _get_git_branch(self, directory):
+        """Get Git branch
+
+        Args:
+            path_to_block: path to block to get Git branch for
+
+
+        Returns:
+           String of branch name or None
+
+        """
+
+        # Command
+        cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % directory
+
+        # Get git branch name
+        result = os.popen(cmd).read().strip()
+
+        # Result
+        if len(result):
+            return result
+        return None
+
+    def _get_blocks(self, params):
+        """Get blocks from params
 
         Consider url params to be block names, discard actual url param values
 
@@ -154,7 +198,7 @@ class ProjectManager(CoreComponent):
         return removed
 
     def clone_block(self, url, path_to_block):
-        """ Clones a block from github's nio-blocks repository
+        """Clones a block from github's nio-blocks repository
 
         Args:
             url: Where to get block from, following are valid
@@ -223,10 +267,11 @@ class ProjectManager(CoreComponent):
         return result
 
     def pip_install_req(self, path_to_block):
-        """ Updates PIP requirements.txt file for a block
+        """Updates PIP requirements.txt file for a block
 
         Args:
-            path_to_block: If None, path is figured out by accessing "blocks" entry from environment configuration
+            path_to_block: If None, path is figured out by accessing "blocks"
+                entry from environment configuration
 
         Returns:
             Operation True or False
@@ -243,14 +288,14 @@ class ProjectManager(CoreComponent):
             return True
 
         # Pip install
-        res = pip.main(['install', '-r', path_req])
+        res = pip.main(["install", "-r", path_req])
         if res != 0:
             return False
 
         return True
 
     def update_block(self, blocks):
-        """ Pulls down block latest version and updates submodules
+        """Pulls down block latest version and updates submodules
 
         Args:
             block: block folder
@@ -277,7 +322,10 @@ class ProjectManager(CoreComponent):
                     chdir(blocks_path)
 
                 # update block
-                result = self._get_subprocess_return(self._subprocess_call("git fetch origin --progress --prune"), "updating block")
+                result = self._get_subprocess_return(
+                    self._subprocess_call(
+                        "git fetch origin --progress --prune"),
+                    "updating block")
                 results.append({block_structure["name"]: result})
                 updates_in_path = True
 
@@ -294,6 +342,16 @@ class ProjectManager(CoreComponent):
 
     @staticmethod
     def _get_subprocess_return(result, message):
+        """Get subprocess results
+
+        Args:
+            result: Result from subprocess call
+            message: Message to format result with
+
+        Returns:
+           Array with results of subprocess
+        """
+
         if result < 0:
             result = {"status":
                       "while {0}, received killed by "
@@ -310,6 +368,12 @@ class ProjectManager(CoreComponent):
 
     @staticmethod
     def _get_abs_blocks_paths():
+        """Get absolute path of blocks
+
+        Returns:
+           String with absolute path to blocks
+        """
+
         blocks_resource_paths = NIOEnvironment.get_resource_paths('blocks',
                                                                   'blocks')
         abs_blocks_paths = []
@@ -322,15 +386,76 @@ class ProjectManager(CoreComponent):
 
     @staticmethod
     def _remove_dir(full_path):
-        rmtree(full_path)
+        """Remove directory
+
+        Args:
+            full_path: Full path to directory
+
+        Returns:
+           True or false
+        """
+
+        try:
+
+            # Sanity check
+            if not path.isdir(full_path):
+                return False
+
+            # Delete directory
+            rmtree(full_path)
+
+        except Exception:
+
+            # Log
+            get_nio_logger("ProjectManager").exception(
+                "Failure removing directory {0}".format(full_path))
+
+            return False
+
+        return True
 
     @staticmethod
     def _remove_file(file):
-        remove(file)
+        """Remove file
+
+        Args:
+            file: Full path to file
+
+        Returns:
+           True or false
+        """
+
+        try:
+
+            # Sanity check
+            if not path.isfile(file):
+                return False
+
+            # Delete directory
+            remove(file)
+
+        except Exception:
+
+            # Log
+            get_nio_logger("ProjectManager").exception(
+                "Failure removing file {0}".format(file))
+
+            return False
+
+        return True
+
 
     @staticmethod
     def _get_block_path_structure(blocks_path):
-        """ Return file structure under a given path """
+        """Return file structure under a given path
+
+        Args:
+            blocks_path: Path to blocks
+
+        Returns:
+            Array of blocks
+        """
+
         blocks = []
         for item in listdir(blocks_path):
             # discard known exclusions
@@ -350,4 +475,23 @@ class ProjectManager(CoreComponent):
 
     @staticmethod
     def _subprocess_call(command):
+        """Executes sub process command
+
+        Returns:
+           True or false
+        """
+
         return subprocess.call(command, shell=True)
+
+    @staticmethod
+    def _subprocess_call_with_res(command):
+        """Executes sub process command and returns response
+
+        Returns:
+           True or false
+        """
+
+        process = subprocess.Popen(command, shell=True,stdout=subprocess.PIPE)
+        res, err = process.communicate()
+
+        return res

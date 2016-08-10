@@ -12,6 +12,8 @@ from nio.modules.web import RESTHandler
 class ProjectManagerHandler(RESTHandler):
     """ Handles 'project' API requests
     """
+
+
     def __init__(self, route, project_manager):
         super().__init__(route)
         self._project_manager = project_manager
@@ -23,16 +25,30 @@ class ProjectManagerHandler(RESTHandler):
 
         Example:
             http://[host]:[port]/project/blocks
+            http://[host]:[port]/project/blocks?branches=1
 
         """
+
+        # Log
         params = request.get_params()
         self.logger.debug("on_get, params: {0}".format(params))
 
+        # Result default to none
         result = None
-        if "identifier" in params:
-            if params["identifier"] == "blocks":
-                result = self._project_manager.get_blocks_structure()
 
+        # What route?
+        if "identifier" in params:
+
+            # -- Blocks
+            if params["identifier"] == "blocks":
+
+                # -- Show branches
+                branches = params.get("branches", 0)
+
+                # -- -- Get block structure
+                result = self._project_manager.get_blocks_structure(branches)
+
+        # Result
         if result is not None:
             response.set_header('Content-Type', 'application/json')
             response.set_body(json.dumps(result))
@@ -115,7 +131,7 @@ class ProjectManagerHandler(RESTHandler):
     def on_put(self, request, response, *args, **kwargs):
         """ API endpoint to handle 'clone' and/or 'update' repository operations
 
-        Passes along to on_post handler.
+            Passes along to on_post handler.
         """
 
         return self.on_post(request, response, args, kwargs)
