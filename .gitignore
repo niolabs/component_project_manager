@@ -13,3 +13,6 @@ test_results.xml
 
 # vim swap files
 *.swp
+
+# Test cache
+/.cache
