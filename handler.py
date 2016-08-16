@@ -42,11 +42,11 @@ class ProjectManagerHandler(RESTHandler):
             # -- Blocks
             if params["identifier"] == "blocks":
 
-                # -- Show branches
-                branches = params.get("branches", 0)
+                # -- Get branch info
+                get_branch_info = bool(params.get("branches", 0))
 
                 # -- -- Get block structure
-                result = self._project_manager.get_blocks_structure(branches)
+                result = self._project_manager.get_blocks_structure(get_branch_info)
 
         # Result
         if result is not None:
