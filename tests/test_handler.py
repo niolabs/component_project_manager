@@ -25,7 +25,7 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
         request.get_params.return_value = {"identifier": "blocks"}
         response = MagicMock(spec=Response)
         handler.on_get(request, response)
-        self.assertEqual(project_manager.get_blocks_structure.call_count, 1)
+        self.assertEqual(project_manager.get_blocks_structure.call_count, True)
 
     def test_on_get_invalid_params(self):
         project_manager = ProjectManager()

@@ -29,7 +29,11 @@ class ProjectManager(CoreComponent):
 
     _name = "ProjectManager"
 
-    exclusions = ["__pycache__", ".git", "__init__.py", "README.md", ".DS_Store"]
+    exclusions = ["__pycache__",
+                  ".git",
+                  "__init__.py",
+                  "README.md",
+                  ".DS_Store"]
 
     def __init__(self):
         """Initializes the component
@@ -80,11 +84,11 @@ class ProjectManager(CoreComponent):
         self._rest_manager.remove_web_handler(self._handler)
         super().stop()
 
-    def get_blocks_structure(self, branches = 0):
+    def get_blocks_structure(self, get_branch_info=False):
         """ Get block structure from disk
 
         Args:
-            branches: Show git branches for each block
+            get_branch_info: Show git branches for each block
 
         Returns:
            Structure with an Array of blocks
@@ -114,14 +118,13 @@ class ProjectManager(CoreComponent):
                 elif path.isfile(block_full_path):
                     block = {"name": path.splitext(item)[0], "type": "file"}
 
-                # -- Get branches
-                if branches:
+                # -- Get branch info?
+                if get_branch_info:
                     block["branch"] = self._get_git_branch(block_full_path)
 
                 # -- Add block
                 if block is not None:
                     ret.append(block)
-
 
         return {"blocks": ret}
 
@@ -129,7 +132,7 @@ class ProjectManager(CoreComponent):
         """Get Git branch
 
         Args:
-            path_to_block: path to block to get Git branch for
+            directory: path to block to get Git branch for
 
 
         Returns:
@@ -146,6 +149,7 @@ class ProjectManager(CoreComponent):
         # Result
         if len(result):
             return result
+
         return None
 
     def _get_blocks(self, params):
@@ -164,18 +168,16 @@ class ProjectManager(CoreComponent):
 
         return blocks
 
-
     def remove_blocks(self, blocks):
         """Remove blocks from disk
 
         Args:
-            block: block folder
+            blocks: block folder
 
         Returns:
            Array of removed blocks
 
         """
-
 
         blocks_paths = self._get_abs_blocks_paths()
         removed = []
@@ -261,7 +263,6 @@ class ProjectManager(CoreComponent):
         if res == 0:
             self.pip_install_req("{0}/{1}".format(path_to_block, block_dir))
 
-
         # Get process return
         result = self._get_subprocess_return(res, "cloning block")
         return result
@@ -298,7 +299,7 @@ class ProjectManager(CoreComponent):
         """Pulls down block latest version and updates submodules
 
         Args:
-            block: block folder
+            blocks: block folder
 
         Returns:
             Operation status as a dictionary
@@ -331,12 +332,13 @@ class ProjectManager(CoreComponent):
 
             # update submodules if there were any updates in path
             if updates_in_path:
-                self._subprocess_call("git submodule update --init --recursive")
+                self._subprocess_call(
+                    "git submodule update --init --recursive")
 
         if len(blocks):
             # warning about requested blocks that were not found
             self.logger.warning("Blocks: {0} are not installed".
-                                 format(blocks))
+                                format(blocks))
 
         return results
 
@@ -444,7 +446,6 @@ class ProjectManager(CoreComponent):
 
         return True
 
-
     @staticmethod
     def _get_block_path_structure(blocks_path):
         """Return file structure under a given path
@@ -491,7 +492,7 @@ class ProjectManager(CoreComponent):
            True or false
         """
 
-        process = subprocess.Popen(command, shell=True,stdout=subprocess.PIPE)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         res, err = process.communicate()
 
         return res
