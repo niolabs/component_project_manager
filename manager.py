@@ -150,7 +150,7 @@ class ProjectManager(CoreComponent):
 
         return None
 
-    def _get_blocks(self, params):
+    def get_blocks(self, params):
         """Get blocks from params
 
         Consider url params to be block names, discard actual url param values
