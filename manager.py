@@ -86,6 +86,15 @@ class ProjectManager(CoreComponent):
         self._rest_manager.remove_web_handler(self._handler)
         super().stop()
 
+    def get_order(self):
+        """ Get the order the component will start/configure in.
+
+        We want to make sure that this component configures before
+        the BlockManager since we will be cloning blocks and we want
+        that component to be able to discover them.
+        """
+        return 30
+
     def _clone_configured_blocks(self):
         """ Clone down blocks that the instance needs
 
