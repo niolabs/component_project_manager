@@ -7,6 +7,7 @@ import subprocess
 from os import listdir, path, remove, chdir
 from shutil import rmtree
 
+from nio.modules.settings import Settings
 from nio.util.logging import get_nio_logger
 from nio.util.versioning.dependency import DependsOn
 from niocore.core.component import CoreComponent
@@ -58,6 +59,9 @@ class ProjectManager(CoreComponent):
         # Register dependencies to rest and service manager
         self._rest_manager = self.get_dependency("RESTManager")
 
+        # Clone down any blocks that were configured in the instance settings
+        self._clone_configured_blocks()
+
     def start(self):
         """Starts component
 
@@ -81,6 +85,57 @@ class ProjectManager(CoreComponent):
         # Remove handler from WebServer
         self._rest_manager.remove_web_handler(self._handler)
         super().stop()
+
+    def _clone_configured_blocks(self):
+        """ Clone down blocks that the instance needs
+
+        If the instance config specifies blocks to clone in the settings
+        then clone them down now, before the BlockManager does its
+        discovery.
+        """
+        blocks = Settings.getdict(
+            'environment', 'blocks_from', fallback='etc/blocks.json')
+
+        if not blocks:
+            self.logger.debug("No blocks to clone")
+
+        for block in blocks.get('blocks', []):
+            repo, branch = self._parse_block(block)
+            # Clone the repo with the configured branch. If the block already
+            # exists in this project then it will NOT be overwritten and the
+            # branch will not be switched
+            self.clone_block(repo, branch=branch)
+
+    def _parse_block(self, block):
+        """ Parse a configured block into a URL and a branch
+
+        This parse method allows the configuration to hold just the URL or a
+        combination of a URL and branch. The configuration options are:
+
+            {
+                "url": "git@github.com:nio-blocks/filter.git",
+                "branch": "master"
+            }
+
+            --- OR ---
+
+            "git@github.com:nio-blocks/filter.git"
+
+        Returns:
+            repo_url, repo_branch: The URL and branch to checkout. If no
+                branch is specified, repo_branch will be None
+        """
+        if isinstance(block, str):
+            # They only provided the URL, don't return a branch
+            return block, None
+
+        if not isinstance(block, dict):
+            raise TypeError("Block must be a string or dict")
+
+        repo_url = block.get('url')
+        repo_branch = block.get('branch', None)
+
+        return repo_url, repo_branch
 
     def get_blocks_structure(self, get_branch_info=False):
         """ Get block structure from disk
@@ -197,8 +252,11 @@ class ProjectManager(CoreComponent):
 
         return removed
 
-    def clone_block(self, url, path_to_block):
+    def clone_block(self, url, path_to_block=None, branch=None):
         """Clones a block from github's nio-blocks repository
+
+        Note: if a repository already exists at the given clone location
+        then no clone will occur.
 
         Args:
             url: Where to get block from, following are valid
@@ -245,10 +303,18 @@ class ProjectManager(CoreComponent):
             raise
 
         # Log
-        self.logger.info("Cloning Git repository: {0}".format(url))
 
         # Get block from git
-        res = self._subprocess_call("git clone --recursive {0}".format(url))
+        if branch is not None:
+            self.logger.info(
+                "Cloning {} branch for git repository: {}".format(branch, url))
+            res = self._subprocess_call(
+                "git clone --recursive {} -b {}".format(url, branch))
+        else:
+            self.logger.info(
+                "Cloning default branch for git repository: {}".format(url))
+            res = self._subprocess_call(
+                "git clone --recursive {}".format(url))
 
         # Get the directory that this was cloned into
         block_dir, block_dir_ext = os.path.splitext(os.path.basename(url))

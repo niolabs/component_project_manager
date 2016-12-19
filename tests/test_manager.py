@@ -2,6 +2,7 @@ from os import path, chdir
 
 from unittest.mock import ANY, patch, Mock
 from niocore.core.context import CoreContext
+from nio.modules.settings import Settings
 from nio.modules.web import RESTHandler
 from niocore.util.environment import NIOEnvironment
 from niocore.testing.test_case import NIOCoreTestCase
@@ -81,6 +82,53 @@ class TestProjectManager(NIOCoreTestCase):
                     found = True
                     break
             self.assertTrue(found)
+
+    def test_clone_on_configure(self):
+        """ Test that blocks get cloned when the component configures """
+        Settings.set('environment', 'blocks_from', value={
+            "blocks": [
+                "block_1_as_str",
+                {
+                    "url": "block_2_as_dict",
+                    "branch": "block_2_branch"
+                },
+                {
+                    "url": "block_3_no_branch"
+                }
+            ]
+        })
+
+        rest_manager = Mock()
+        project_manager = ProjectManager()
+
+        context = CoreContext([], [])
+        project_manager = ProjectManager()
+        project_manager.get_dependency = Mock(return_value=rest_manager)
+
+        with patch.object(project_manager, 'clone_block') as clone_mock:
+            project_manager.configure(context)
+            # Make sure we got all 3 clone calls properly
+            self.assertEqual(clone_mock.call_count, 3)
+
+            # Block 1 only provided a string for the URL
+            self.assertEqual(
+                clone_mock.call_args_list[0][0][0],
+                'block_1_as_str')
+            self.assertIsNone(clone_mock.call_args_list[0][1]['branch'])
+
+            # Block 2 provided both url and branch
+            self.assertEqual(
+                clone_mock.call_args_list[1][0][0],
+                'block_2_as_dict')
+            self.assertEqual(
+                clone_mock.call_args_list[1][1]['branch'],
+                'block_2_branch')
+
+            # Block 3 only provided a string for the URL but inside a dict
+            self.assertEqual(
+                clone_mock.call_args_list[2][0][0],
+                'block_3_no_branch')
+            self.assertIsNone(clone_mock.call_args_list[2][1]['branch'])
 
     def test_remove_blocks(self):
         # asserts that blocks retrieved match defined structure
@@ -188,7 +236,6 @@ class TestProjectManager(NIOCoreTestCase):
         # assert fetch call arguments
         project_manager._subprocess_call.assert_any_call(
             "git fetch origin --progress --prune")
-
 
     def test_update_invalid_block(self):
 
