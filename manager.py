@@ -7,7 +7,7 @@ import subprocess
 from os import listdir, path, remove, chdir
 from shutil import rmtree
 
-from nio.modules.settings import Settings
+from nio.modules.persistence import Persistence
 from nio.util.logging import get_nio_logger
 from nio.util.versioning.dependency import DependsOn
 from niocore.core.component import CoreComponent
@@ -43,6 +43,10 @@ class ProjectManager(CoreComponent):
 
         # dependency components
         self._rest_manager = None
+
+        # allocate persistence instance to use to load/save cloned blocks
+        self._persistence = Persistence()
+        self._blocks_from = None
 
     def configure(self, context):
         """ Configures project manager
@@ -102,13 +106,17 @@ class ProjectManager(CoreComponent):
         then clone them down now, before the BlockManager does its
         discovery.
         """
-        blocks = Settings.getdict(
-            'environment', 'blocks_from', fallback='etc/blocks.json')
 
-        if not blocks:
+        # load blocks to clone,
+        # for file persistence, it will load from etc/blocks.cfg
+        # for redis persistence, it will load from field 'blocks' and hash 'nio'
+        self._blocks_from = self._persistence.load("blocks",
+                                                   default={"blocks": []})
+
+        if not self._blocks_from:
             self.logger.debug("No blocks to clone")
 
-        for block in blocks.get('blocks', []):
+        for block in self._blocks_from.get('blocks'):
             repo, branch = self._parse_block(block)
             # Clone the repo with the configured branch. If the block already
             # exists in this project then it will NOT be overwritten and the
@@ -280,9 +288,10 @@ class ProjectManager(CoreComponent):
         Returns:
             Operation status as a dictionary
         """
+        # original block url to be saved should block not be persisted already
+        original_url = url
 
         # Processing url
-
         # Assume a .git ending
         if not url.endswith(".git"):
             url = "{0}.git".format(url)
@@ -311,8 +320,6 @@ class ProjectManager(CoreComponent):
             self.logger.error("Path '{0}' is invalid".format(path_to_block))
             raise
 
-        # Log
-
         # Get block from git
         if branch is not None:
             self.logger.info(
@@ -328,7 +335,6 @@ class ProjectManager(CoreComponent):
         # Get the directory that this was cloned into
         block_dir, block_dir_ext = os.path.splitext(os.path.basename(url))
 
-        # Log
         self.logger.info("Cloning Git repository into directory: {0}"
                          .format(block_dir))
 
@@ -338,6 +344,15 @@ class ProjectManager(CoreComponent):
 
         # Get process return
         result = self._get_subprocess_return(res, "cloning block")
+        if result["status"] == "ok":
+            self.logger.info("Cloning block from: {0} was a success".
+                             format(url))
+            # save it so that it is available next time
+            if original_url not in self._blocks_from['blocks']:
+                self._blocks_from['blocks'].append(original_url)
+                # persist it
+                self._persistence.save(self._blocks_from, "blocks")
+
         return result
 
     def pip_install_req(self, path_to_block):

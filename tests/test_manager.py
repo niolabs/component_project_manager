@@ -2,7 +2,7 @@ from os import path, chdir
 
 from unittest.mock import ANY, patch, Mock
 from niocore.core.context import CoreContext
-from nio.modules.settings import Settings
+from nio.modules.persistence import Persistence
 from nio.modules.web import RESTHandler
 from niocore.util.environment import NIOEnvironment
 from niocore.testing.test_case import NIOCoreTestCase
@@ -85,7 +85,8 @@ class TestProjectManager(NIOCoreTestCase):
 
     def test_clone_on_configure(self):
         """ Test that blocks get cloned when the component configures """
-        Settings.set('environment', 'blocks_from', value={
+        persistence = Persistence()
+        blocks = {
             "blocks": [
                 "block_1_as_str",
                 {
@@ -96,11 +97,10 @@ class TestProjectManager(NIOCoreTestCase):
                     "url": "block_3_no_branch"
                 }
             ]
-        })
+        }
+        persistence.save(blocks, "blocks")
 
         rest_manager = Mock()
-        project_manager = ProjectManager()
-
         context = CoreContext([], [])
         project_manager = ProjectManager()
         project_manager.get_dependency = Mock(return_value=rest_manager)
@@ -157,6 +157,9 @@ class TestProjectManager(NIOCoreTestCase):
         subprocess_patch.call = Mock(return_value=0)
 
         project_manager = ProjectManager()
+        project_manager.get_dependency = Mock()
+        project_manager.configure(CoreContext([], []))
+
         url = "block_template"
         result = project_manager.clone_block(url, None)
 
