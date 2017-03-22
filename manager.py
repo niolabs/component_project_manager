@@ -304,8 +304,8 @@ class ProjectManager(CoreComponent):
         # Assume github.com for host
         # POST /project/blocks url=nio-blocks/util
         if "github.com" not in url:
-            # target, git@github.com:nio-blocks/util.git
-            url = "git@github.com:{0}".format(url)
+            # target, https://git@github.com/nio-blocks/util.git
+            url = "https://git@github.com/{0}".format(url)
 
         # Go to target path
         if not path_to_block:
@@ -320,6 +320,11 @@ class ProjectManager(CoreComponent):
             self.logger.error("Path '{0}' is invalid".format(path_to_block))
             raise
 
+        # Get the directory that this will be cloned into
+        block_dir, _ = os.path.splitext(os.path.basename(url))
+        self.logger.info("Cloning Git repository into directory: {}"
+                         .format(block_dir))
+
         # Get block from git
         if branch is not None:
             self.logger.info(
@@ -331,12 +336,6 @@ class ProjectManager(CoreComponent):
                 "Cloning default branch for git repository: {}".format(url))
             res = self._subprocess_call(
                 "git clone --recursive {}".format(url))
-
-        # Get the directory that this was cloned into
-        block_dir, block_dir_ext = os.path.splitext(os.path.basename(url))
-
-        self.logger.info("Cloning Git repository into directory: {0}"
-                         .format(block_dir))
 
         # Update pip requirements
         if res == 0:
