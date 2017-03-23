@@ -153,6 +153,8 @@ class TestProjectManager(NIOCoreTestCase):
     @patch(ProjectManager.__module__ + ".chdir")
     @patch(ProjectManager.__module__ + ".subprocess")
     def test_clone_blocks_ok(self, subprocess_patch, chdir_patch):
+        """ Asserts different url specifications
+        """
 
         subprocess_patch.call = Mock(return_value=0)
 
@@ -160,14 +162,13 @@ class TestProjectManager(NIOCoreTestCase):
         project_manager.get_dependency = Mock()
         project_manager.configure(CoreContext([], []))
 
+        # specify just block as url and verify that cloning call uses https
         url = "block_template"
         result = project_manager.clone_block(url, None)
-
         self.assertEqual(result["status"], "ok")
-        # two subprocess calls, first to clone, second to update submodules
-
+        # assert that it used https
         cmd = "git clone --recursive " \
-              "git@github.com:nio-blocks/block_template.git"
+              "https://git@github.com/nio-blocks/block_template.git"
         subprocess_patch.call.assert_any_call(cmd, shell=True)
         subprocess_patch.call.reset_mock()
 
@@ -175,51 +176,50 @@ class TestProjectManager(NIOCoreTestCase):
         chdir_patch.assert_called_once_with(path.join(self._root_path,
                                                       "blocks"))
 
+        # specify nio-blocks as part of the url
         url = "nio-blocks/block_template"
         result = project_manager.clone_block(url, None)
-
-        cmd = "git clone --recursive " \
-              "git@github.com:nio-blocks/block_template.git"
-
         self.assertEqual(result["status"], "ok")
+        # assert cmd as expected
+        cmd = "git clone --recursive " \
+              "https://git@github.com/nio-blocks/block_template.git"
         subprocess_patch.call.assert_any_call(cmd, shell=True)
         subprocess_patch.call.reset_mock()
 
-        # full url
+        # specify full url
         url = "git@github.com:nio-blocks/block_template"
         result = project_manager.clone_block(url, None)
-
+        self.assertEqual(result["status"], "ok")
+        # assert that git url is as entered (no https this time)
         cmd = "git clone --recursive " \
               "git@github.com:nio-blocks/block_template.git"
-
-        self.assertEqual(result["status"], "ok")
         subprocess_patch.call.assert_any_call(cmd, shell=True)
         subprocess_patch.call.reset_mock()
 
         # another full url format
         url = "https://github.com/nio-blocks/util.git"
         result = project_manager.clone_block(url, None)
-
-        cmd = "git clone --recursive https://github.com/nio-blocks/util.git"
-
         self.assertEqual(result["status"], "ok")
+        # assert that git url is as entered
+        cmd = "git clone --recursive https://github.com/nio-blocks/util.git"
         subprocess_patch.call.assert_any_call(cmd, shell=True)
         subprocess_patch.call.reset_mock()
 
     @patch(ProjectManager.__module__ + ".subprocess")
     def test_clone_blocks_not_ok(self, subprocess_patch):
-
+        """ Asserts failure to clone when subprocess call fails
+        """
         subprocess_patch.call = Mock(return_value=128)
 
         project_manager = ProjectManager()
 
         url = "block_template"
         result = project_manager.clone_block(url, None)
+        # assert failure to clone
         self.assertNotEqual(result["status"], "ok")
 
         cmd = "git clone --recursive " \
-              "git@github.com:nio-blocks/block_template.git"
-
+              "https://git@github.com/nio-blocks/block_template.git"
         # since this call fails, there is only one subprocess call
         subprocess_patch.call.assert_called_once_with(cmd, shell=True)
         subprocess_patch.call.reset_mock()
