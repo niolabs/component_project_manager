@@ -15,7 +15,6 @@ from niocore.util.environment import NIOEnvironment
 from nio import discoverable
 
 from .handler import ProjectManagerHandler
-import os.path
 
 
 @DependsOn("niocore.components.rest", "0.1.0")
@@ -117,11 +116,13 @@ class ProjectManager(CoreComponent):
             self.logger.debug("No blocks to clone")
 
         for block in self._blocks_from.get('blocks'):
-            repo, branch = self._parse_block(block)
+            repo, tag, branch, path_to_block = self._parse_block(block)
             # Clone the repo with the configured branch. If the block already
             # exists in this project then it will NOT be overwritten and the
             # branch will not be switched
-            self.clone_block(repo, branch=branch)
+            self.clone_block(
+                repo, tag=tag, branch=branch, path_to_block=path_to_block
+            )
 
     def _parse_block(self, block):
         """ Parse a configured block into a URL and a branch
@@ -131,7 +132,9 @@ class ProjectManager(CoreComponent):
 
             {
                 "url": "git@github.com:nio-blocks/filter.git",
-                "branch": "master"
+                "tag": "v1.0.0",
+                "branch": "master",
+                "path": None
             }
 
             --- OR ---
@@ -144,15 +147,17 @@ class ProjectManager(CoreComponent):
         """
         if isinstance(block, str):
             # They only provided the URL, don't return a branch
-            return block, None
+            return block, None, None, None
 
         if not isinstance(block, dict):
             raise TypeError("Block must be a string or dict")
 
         repo_url = block.get('url')
+        tag = block.get('tag', None)
         repo_branch = block.get('branch', None)
+        path_to_block = block.get('path', None)
 
-        return repo_url, repo_branch
+        return repo_url, tag, repo_branch, path_to_block
 
     def get_blocks_structure(self, get_branch_info=False):
         """ Get block structure from disk
@@ -269,7 +274,7 @@ class ProjectManager(CoreComponent):
 
         return removed
 
-    def clone_block(self, url, path_to_block=None, branch=None):
+    def clone_block(self, url, tag=None, path_to_block=None, branch=None):
         """Clones a block from github's nio-blocks repository
 
         Note: if a repository already exists at the given clone location
@@ -282,14 +287,20 @@ class ProjectManager(CoreComponent):
                 /project/blocks url=util
                 /project/blocks url=nio-blocks/util
 
+            tag: tag to checkout (ignored if None)
+
             path_to_block: If None, path is figured out by accessing
                 "blocks" entry from environment configuration
+
+            branch: branch to clone (ignored if None)
 
         Returns:
             Operation status as a dictionary
         """
-        # original block url to be saved should block not be persisted already
+        # save parameters that are modified so that we have a handle to them
+        # if eventually need to be saved
         original_url = url
+        original_path_to_block = path_to_block
 
         # Processing url
         # Assume a .git ending
@@ -321,7 +332,7 @@ class ProjectManager(CoreComponent):
             raise
 
         # Get the directory that this will be cloned into
-        block_dir, _ = os.path.splitext(os.path.basename(url))
+        block_dir, _ = path.splitext(path.basename(url))
         self.logger.info("Cloning Git repository into directory: {}"
                          .format(block_dir))
 
@@ -344,13 +355,26 @@ class ProjectManager(CoreComponent):
         # Get process return
         result = self._get_subprocess_return(res, "cloning block")
         if result["status"] == "ok":
+            if tag:
+                self.logger.info("Checking out tag: {}".format(tag))
+
+                # cd to folder and check out tag
+                target_dir = path.join(path_to_block, block_dir)
+                chdir(target_dir)
+                res = self._subprocess_call("git checkout {}".format(tag))
+                result = self._get_subprocess_return(res, "tag checkout")
+                if result["status"] != "ok":
+                    self.logger.error('Failed to checkout specified tag: {}'.
+                                      format(result["status"]))
+                    return result
+
             self.logger.info("Cloning block from: {0} was a success".
                              format(url))
-            # save it so that it is available next time
-            if original_url not in self._blocks_from['blocks']:
-                self._blocks_from['blocks'].append(original_url)
-                # persist it
-                self._persistence.save(self._blocks_from, "blocks")
+            # save it so that it is available next time if needed
+            self._save_cloned_block(original_url,
+                                    tag,
+                                    branch,
+                                    original_path_to_block)
 
         return result
 
@@ -372,7 +396,7 @@ class ProjectManager(CoreComponent):
         self.logger.info("Install PIP requirements at {0}".format(path_req))
 
         # If we do not have a file, we are good
-        if not os.path.isfile(path_req):
+        if not path.isfile(path_req):
             return True
 
         try:
@@ -592,3 +616,38 @@ class ProjectManager(CoreComponent):
         res, err = process.communicate()
 
         return res
+
+    def _save_cloned_block(self, url, tag, branch, path_to_block):
+        """ Saves a clone operation parameters
+
+        Overrides entry in case it existed so that latest parameters
+        that gave origin to the block can be referenced
+
+        Args:
+            url: original block url (can be an incomplete url)
+            tag: block tag
+            branch: block branch
+            path_to_block: block path
+        """
+        # find reference and remove it if it exists
+        for block in self._blocks_from['blocks']:
+            if isinstance(block, str):
+                if url == block:
+                    # save it now as dict
+                    self._blocks_from['blocks'].remove(block)
+                    break
+            elif isinstance(block, dict):
+                if block["url"] == url:
+                    self._blocks_from['blocks'].remove(block)
+                    break
+        # add fresh entry
+        self._blocks_from['blocks'].append(
+            {
+                "url": url,
+                "tag": tag,
+                "branch": branch,
+                "path": path_to_block
+            }
+        )
+        # persist it
+        self._persistence.save(self._blocks_from, "blocks")

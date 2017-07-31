@@ -115,11 +115,15 @@ class ProjectManagerHandler(RESTHandler):
                 if "url" in body:
                     # access url
                     url = body["url"]
+                    tag = body["tag"] if "tag" in body else None
                     # target path, if no path available, system will provide it
                     path_to_block = body["path"] if "path" in body else None
+                    branch = body["branch"] if "branch" in body else None
 
                     result = \
-                        self._project_manager.clone_block(url, path_to_block)
+                        self._project_manager.clone_block(
+                            url, tag, path_to_block, branch
+                        )
                 else:
                     # when no url is specified, then default to blocks,
                     # in which case, interpret it as block updates
