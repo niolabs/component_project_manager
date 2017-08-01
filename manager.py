@@ -6,6 +6,7 @@
 import subprocess
 from os import listdir, path, remove, chdir
 from shutil import rmtree
+from urllib.parse import urlparse, urlunparse
 
 from nio.modules.persistence import Persistence
 from nio.util.logging import get_nio_logger
@@ -302,21 +303,7 @@ class ProjectManager(CoreComponent):
         original_url = url
         original_path_to_block = path_to_block
 
-        # Processing url
-        # Assume a .git ending
-        if not url.endswith(".git"):
-            url = "{0}.git".format(url)
-
-        # Assume nio-blocks repository if no repo name
-        # POST /project/blocks url=util
-        if "nio-blocks" not in url:
-            url = "nio-blocks/{0}".format(url)
-
-        # Assume github.com for host
-        # POST /project/blocks url=nio-blocks/util
-        if "github.com" not in url:
-            # target, https://git@github.com/nio-blocks/util.git
-            url = "https://git@github.com/{0}".format(url)
+        url = self._process_url(url)
 
         # Go to target path
         if not path_to_block:
@@ -651,3 +638,50 @@ class ProjectManager(CoreComponent):
         )
         # persist it
         self._persistence.save(self._blocks_from, "blocks")
+
+    @staticmethod
+    def _process_url(url):
+        """ Process given url filling in with 'nio defaults' when not complete
+
+        This method 'decomposes' the url, check if the parts are complete, if
+        not complete, it fills missing components with 'nio defaults' and
+        composes it back
+
+        Args:
+            url (string): original url
+
+        Returns:
+            completed url
+        """
+
+        # <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+        (scheme, netloc, path, params, query, fragment) = urlparse(url)
+        if not path:
+            raise ValueError("url must contain at least the block name")
+
+        # remove ending '/' for simplicity
+        if path.endswith("/"):
+            path = path[:-1]
+        if not path.endswith(".git"):
+            path += ".git"
+
+        # determine if path contains the 'org'
+        # when a single string is provided it assumes 'block name'
+        split_path = path.split('/')
+        if len(split_path) == 2 and len(split_path[0]) == 0:
+            # incoming path is a single string with '/' at the front
+            path = "nio-blocks/{}".format(path[1:])
+        elif len(split_path) == 1:
+            # incoming path is a single string
+            path = "nio-blocks/{}".format(path)
+
+        # urlparse recognizes a netloc only if it is properly introduced
+        # by ‘//’. Otherwise the input is presumed to be a relative URL
+        # and thus to start with a path component
+        if not netloc and not scheme and "@" not in path:
+            if path.startswith('/'):
+                path = path[1:]
+            path = "git@github.com:{}".format(path)
+
+        # put the url back together
+        return urlunparse((scheme, netloc, path, params, query, fragment))
