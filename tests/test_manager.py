@@ -164,7 +164,7 @@ class TestProjectManager(NIOCoreTestCase):
 
         # specify just block as url
         url = "block_template"
-        result = project_manager.clone_block(url, None)
+        result = project_manager.clone_block(url)
         self.assertEqual(result["status"], "ok")
         # assert that it used https
         cmd = "git clone --recursive " \
@@ -178,7 +178,7 @@ class TestProjectManager(NIOCoreTestCase):
 
         # specify nio-blocks as part of the url
         url = "nio-blocks/block_template"
-        result = project_manager.clone_block(url, None)
+        result = project_manager.clone_block(url)
         self.assertEqual(result["status"], "ok")
         # assert cmd as expected
         cmd = "git clone --recursive " \
@@ -190,7 +190,7 @@ class TestProjectManager(NIOCoreTestCase):
 
         # specify full url
         url = "git@github.com:nio-blocks/block_template"
-        result = project_manager.clone_block(url, None)
+        result = project_manager.clone_block(url)
         self.assertEqual(result["status"], "ok")
         # assert that git url is as entered (no https this time)
         cmd = "git clone --recursive " \
@@ -200,10 +200,33 @@ class TestProjectManager(NIOCoreTestCase):
 
         # another full url format
         url = "https://github.com/nio-blocks/util.git"
-        result = project_manager.clone_block(url, None)
+        result = project_manager.clone_block(url)
         self.assertEqual(result["status"], "ok")
         # assert that git url is as entered
         cmd = "git clone --recursive https://github.com/nio-blocks/util.git"
+        subprocess_patch.call.assert_any_call(cmd, shell=True)
+        subprocess_patch.call.reset_mock()
+
+        # specify a tag
+        url = "https://github.com/nio-blocks/util.git"
+        result = project_manager.clone_block(url, tag="v1.0.1")
+        self.assertEqual(result["status"], "ok")
+        # assert that git url is as entered
+        cmd = "git clone --recursive https://github.com/nio-blocks/util.git"
+        subprocess_patch.call.assert_any_call(cmd, shell=True)
+        cmd = "git checkout v1.0.1"
+        subprocess_patch.call.assert_any_call(cmd, shell=True)
+        subprocess_patch.call.reset_mock()
+
+        # specify a branch
+        url = "https://github.com/nio-blocks/util.git"
+        result = project_manager.clone_block(url, tag="v1.0.1", branch="b1")
+        self.assertEqual(result["status"], "ok")
+        # assert that git url is as entered
+        cmd = "git clone --recursive https://github.com/nio-blocks/util.git " \
+              "-b b1"
+        subprocess_patch.call.assert_any_call(cmd, shell=True)
+        cmd = "git checkout v1.0.1"
         subprocess_patch.call.assert_any_call(cmd, shell=True)
         subprocess_patch.call.reset_mock()
 
@@ -216,7 +239,7 @@ class TestProjectManager(NIOCoreTestCase):
         project_manager = ProjectManager()
 
         url = "block_template"
-        result = project_manager.clone_block(url, None)
+        result = project_manager.clone_block(url)
         # assert failure to clone
         self.assertNotEqual(result["status"], "ok")
 
