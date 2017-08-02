@@ -4,7 +4,7 @@
 
 """
 import subprocess
-from os import listdir, path, remove, chdir
+from os import listdir, path, remove, chdir, popen
 from shutil import rmtree
 from urllib.parse import urlparse, urlunparse
 
@@ -220,7 +220,7 @@ class ProjectManager(CoreComponent):
         cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % directory
 
         # Get git branch name
-        result = os.popen(cmd).read().strip()
+        result = popen(cmd).read().strip()
 
         # Result
         if len(result):
