@@ -16,6 +16,7 @@ from niocore.util.environment import NIOEnvironment
 from nio import discoverable
 
 from .handler import ProjectManagerHandler
+from . import __version__ as component_version
 
 
 @DependsOn("niocore.components.rest", "0.1.0")
@@ -47,6 +48,9 @@ class ProjectManager(CoreComponent):
         # allocate persistence instance to use to load/save cloned blocks
         self._persistence = Persistence()
         self._blocks_from = None
+
+    def get_version(self):
+        return component_version
 
     def configure(self, context):
         """ Configures project manager
