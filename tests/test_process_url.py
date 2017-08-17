@@ -24,23 +24,23 @@ class TestProcessUrl(NIOTestCase):
             ),
             (
                 "nio-blocks/simulator",
-                "git@github.com:nio-blocks/simulator.git"
+                "git://github.com/nio-blocks/simulator.git"
             ),
             (
                 "own_org/simulator",
-                "git@github.com:own_org/simulator.git"
+                "git://github.com/own_org/simulator.git"
             ),
             (
                 "/own_org/simulator",
-                "git@github.com:own_org/simulator.git"
+                "git://github.com/own_org/simulator.git"
             ),
             (
                 "/simulator",
-                "git@github.com:nio-blocks/simulator.git"
+                "git://github.com/nio-blocks/simulator.git"
             ),
             (
                 "simulator",
-                "git@github.com:nio-blocks/simulator.git"
+                "git://github.com/nio-blocks/simulator.git"
             ),
             (
                 "git@github.com:nio-blocks/block_template.git",

@@ -685,7 +685,7 @@ class ProjectManager(CoreComponent):
         if not netloc and not scheme and "@" not in path:
             if path.startswith('/'):
                 path = path[1:]
-            path = "git@github.com:{}".format(path)
+            path = "git://github.com/{}".format(path)
 
         # put the url back together
         return urlunparse((scheme, netloc, path, params, query, fragment))
