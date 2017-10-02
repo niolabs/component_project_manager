@@ -319,6 +319,8 @@ class ProjectManager(CoreComponent):
             # if no path specified, grab last path to blocks
             path_to_block = blocks_paths[len(blocks_paths)-1]
         try:
+            # save directory to be restored
+            directory_to_restore = path.abspath(path.curdir)
             chdir(path_to_block)
         except FileNotFoundError:
             self.logger.error("Path '{0}' is invalid".format(path_to_block))
@@ -359,6 +361,8 @@ class ProjectManager(CoreComponent):
                 if result["status"] != "ok":
                     self.logger.error('Failed to checkout specified tag: {}'.
                                       format(result["status"]))
+                    # restoring original current directory
+                    chdir(directory_to_restore)
                     return result
 
             self.logger.info("Cloning block from: {0} was a success".
@@ -369,6 +373,8 @@ class ProjectManager(CoreComponent):
                                     branch,
                                     original_path_to_block)
 
+        # restoring original current directory
+        chdir(directory_to_restore)
         return result
 
     def pip_install_req(self, path_to_block):
@@ -393,7 +399,8 @@ class ProjectManager(CoreComponent):
             return True
 
         try:
-
+            # save directory to be restored
+            directory_to_restore = path.abspath(path.curdir)
             # Change directory to block
             chdir(path_to_block)
 
@@ -403,6 +410,8 @@ class ProjectManager(CoreComponent):
 
         # Pip install
         res = self._subprocess_call("pip3 install -r requirements.txt")
+        # restoring original current directory
+        chdir(directory_to_restore)
         if res != 0:
             return False
 
@@ -419,6 +428,9 @@ class ProjectManager(CoreComponent):
         """
 
         results = []
+
+        # save directory to be restored
+        directory_to_restore = path.abspath(path.curdir)
 
         blocks_paths = self._get_abs_blocks_paths()
         for blocks_path in blocks_paths:
@@ -447,6 +459,9 @@ class ProjectManager(CoreComponent):
             if updates_in_path:
                 self._subprocess_call(
                     "git submodule update --init --recursive")
+
+        # restoring original current directory
+        chdir(directory_to_restore)
 
         if len(blocks):
             # warning about requested blocks that were not found

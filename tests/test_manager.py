@@ -14,8 +14,6 @@ class TestProjectManager(NIOCoreTestCase):
 
     def setUp(self):
 
-        self._saved_dir = path.abspath(path.curdir)
-
         # save previous environment
         self._saved_root = NIOEnvironment._root
         self._saved_conf_file = NIOEnvironment._conf_file
@@ -37,9 +35,6 @@ class TestProjectManager(NIOCoreTestCase):
         NIOEnvironment._conf_file = self._saved_conf_file
         NIOEnvironment._env_file = self._saved_env_file
         NIOEnvironment._env_vars = self._saved_env_vars
-
-        # restore original current directory
-        chdir(self._saved_dir)
 
         super().tearDown()
 
@@ -173,8 +168,13 @@ class TestProjectManager(NIOCoreTestCase):
         subprocess_patch.call.reset_mock()
 
         # assert that chdir call happened
-        chdir_patch.assert_called_once_with(path.join(self._root_path,
-                                                      "blocks"))
+        self.assertGreaterEqual(chdir_patch.call_count, 1)
+        first_chdir_call_arg, = chdir_patch.call_args_list[0][0]
+        self.assertEqual(first_chdir_call_arg,
+                         path.join(self._root_path, "blocks"))
+        # assert that previous directory was restored
+        second_chdir_call_arg, = chdir_patch.call_args_list[1][0]
+        self.assertEqual(second_chdir_call_arg, self._root_path)
 
         # specify nio-blocks as part of the url
         url = "nio-blocks/block_template"
@@ -238,6 +238,10 @@ class TestProjectManager(NIOCoreTestCase):
 
         project_manager = ProjectManager()
 
+        # save current directory and make sure it does not change after
+        # a failed clone_block operation
+        prev_directory = path.abspath(path.curdir)
+
         url = "block_template"
         result = project_manager.clone_block(url)
         # assert failure to clone
@@ -249,10 +253,16 @@ class TestProjectManager(NIOCoreTestCase):
         subprocess_patch.call.assert_called_once_with(cmd, shell=True)
         subprocess_patch.call.reset_mock()
 
+        self.assertEqual(prev_directory, path.abspath(path.curdir))
+
     def test_update_block_ok(self):
 
         project_manager = ProjectManager()
         project_manager._subprocess_call = Mock(return_value=0)
+
+        # save current directory and make sure it does not change after
+        # an update_block operation
+        prev_directory = path.abspath(path.curdir)
 
         results = project_manager.update_block(["twitter"])
         self.assertIn("twitter", results[0])
@@ -264,6 +274,8 @@ class TestProjectManager(NIOCoreTestCase):
         # assert fetch call arguments
         project_manager._subprocess_call.assert_any_call(
             "git fetch origin --progress --prune")
+
+        self.assertEqual(prev_directory, path.abspath(path.curdir))
 
     def test_update_invalid_block(self):
 
@@ -282,6 +294,10 @@ class TestProjectManager(NIOCoreTestCase):
         project_manager = ProjectManager()
         project_manager._subprocess_call = Mock(return_value=0)
 
+        # save current directory and make sure it does not change after
+        # an update_block operation
+        prev_directory = path.abspath(path.curdir)
+
         results = project_manager.update_block([])
 
         # assert that all blocks in project_path were updated
@@ -296,3 +312,5 @@ class TestProjectManager(NIOCoreTestCase):
         # assert fetch call arguments
         project_manager._subprocess_call.assert_any_call(
             "git fetch origin --progress --prune")
+
+        self.assertEqual(prev_directory, path.abspath(path.curdir))
