@@ -145,6 +145,25 @@ class TestProjectManager(NIOCoreTestCase):
         path_to_dummy_block = path.join(root_path, "blocks", "dummy_block.py")
         project_manager._remove_file.assert_called_with(path_to_dummy_block)
 
+    @patch(ProjectManager.__module__ + ".path.isdir")
+    @patch(ProjectManager.__module__ + ".listdir")
+    @patch(ProjectManager.__module__ + ".subprocess")
+    def test_clone_block_to_existent_directory(
+            self, subprocess_patch, listdir_patch, isdir_patch):
+        """ Asserts clone ops are skipped if dir exists and is not empty
+        """
+
+        project_manager = ProjectManager()
+        project_manager.get_dependency = Mock()
+        project_manager.configure(CoreContext([], []))
+
+        listdir_patch.return_value = ['foo']
+        isdir_patch.return_value = True
+        url = "block_template"
+        result = project_manager.clone_block(url)
+        self.assertEqual(result["status"], "skipped")
+        self.assertFalse(subprocess_patch.call_count)
+
     @patch(ProjectManager.__module__ + ".chdir")
     @patch(ProjectManager.__module__ + ".subprocess")
     def test_clone_blocks_ok(self, subprocess_patch, chdir_patch):
