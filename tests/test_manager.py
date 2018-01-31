@@ -147,9 +147,10 @@ class TestProjectManager(NIOCoreTestCase):
 
     @patch(ProjectManager.__module__ + ".path.isdir")
     @patch(ProjectManager.__module__ + ".listdir")
+    @patch(ProjectManager.__module__ + ".chdir")
     @patch(ProjectManager.__module__ + ".subprocess")
     def test_clone_block_to_existent_directory(
-            self, subprocess_patch, listdir_patch, isdir_patch):
+            self, subprocess_patch, chdir_patch, listdir_patch, isdir_patch):
         """ Asserts clone ops are skipped if dir exists and is not empty
         """
 
@@ -163,6 +164,10 @@ class TestProjectManager(NIOCoreTestCase):
         result = project_manager.clone_block(url)
         self.assertEqual(result["status"], "skipped")
         self.assertFalse(subprocess_patch.call_count)
+        # assert that previous directory was restored
+        self.assertEqual(chdir_patch.call_count, 2)
+        self.assertEqual(chdir_patch.call_args_list[-1][0][0],
+                         self._root_path)
 
     @patch(ProjectManager.__module__ + ".chdir")
     @patch(ProjectManager.__module__ + ".subprocess")
