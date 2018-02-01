@@ -328,6 +328,13 @@ class ProjectManager(CoreComponent):
 
         # Get the directory that this will be cloned into
         block_dir, _ = path.splitext(path.basename(url))
+        # check if dir exists and is not empty
+        if path.isdir(block_dir) and len(listdir(block_dir)):
+            self.logger.info("{} Already exists and is not empty, skipping"
+                             .format(block_dir))
+            # restoring original current directory
+            chdir(directory_to_restore)
+            return {"status": "skipped"}
         self.logger.info("Cloning Git repository into directory: {}"
                          .format(block_dir))
 
