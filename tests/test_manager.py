@@ -16,15 +16,13 @@ class TestProjectManager(NIOCoreTestCase):
 
         # save previous environment
         self._saved_root = NIOEnvironment._root
-        self._saved_conf_file = NIOEnvironment._conf_file
-        self._saved_env_file = NIOEnvironment._env_file
-        self._saved_env_vars = NIOEnvironment._env_vars
+        self._saved_conf_files = NIOEnvironment._conf_files
 
         # override NIO environment before Settings module is initialized
         self._root_path = path.join(
             path.dirname(path.abspath(path.realpath(__file__))),
             'project_path')
-        NIOEnvironment.set_environment(self._root_path, 'nio.conf', 'nio.env')
+        NIOEnvironment.set_environment(self._root_path, ['nio.conf'])
 
         super().setUp()
 
@@ -32,9 +30,7 @@ class TestProjectManager(NIOCoreTestCase):
 
         # restore previous environment
         NIOEnvironment._root = self._saved_root
-        NIOEnvironment._conf_file = self._saved_conf_file
-        NIOEnvironment._env_file = self._saved_env_file
-        NIOEnvironment._env_vars = self._saved_env_vars
+        NIOEnvironment._conf_files = self._saved_conf_files
 
         super().tearDown()
 
