@@ -326,62 +326,67 @@ class ProjectManager(CoreComponent):
             self.logger.error("Path '{0}' is invalid".format(path_to_block))
             raise
 
-        # Get the directory that this will be cloned into
-        block_dir, _ = path.splitext(path.basename(url))
-        # check if dir exists and is not empty
-        if path.isdir(block_dir) and len(listdir(block_dir)):
-            self.logger.info("{} Already exists and is not empty, skipping"
+        # start a try block to ensure/simplify restoring current directory
+        try:
+            # Get the directory that this will be cloned into
+            block_dir, _ = path.splitext(path.basename(url))
+            # check if dir exists and if it is not empty
+            if path.isdir(block_dir) and len(listdir(block_dir)):
+                msg = \
+                    "'{}' folder already exists and it is not empty, skipping".\
+                    format(block_dir)
+                raise ValueError(msg)
+
+            self.logger.info("Cloning Git repository into directory: {}"
                              .format(block_dir))
+
+            # Get block from git
+            if branch is not None:
+                self.logger.info("Cloning {} branch for git repository: {}".
+                                 format(branch, url))
+                res = self._subprocess_call(
+                    "git clone --recursive {} -b {}".format(url, branch))
+            else:
+                self.logger.info(
+                    "Cloning default branch for git repository: {}".format(url))
+                res = self._subprocess_call(
+                    "git clone --recursive {}".format(url))
+
+            # Update pip requirements
+            if res == 0:
+                self.pip_install_req("{0}/{1}".format(path_to_block, block_dir))
+
+            # Get process return
+            result = self._get_subprocess_return(res, "cloning block")
+            if result["status"] == "ok":
+                if tag:
+                    self.logger.info("Checking out tag: {}".format(tag))
+
+                    # cd to folder and check out tag
+                    target_dir = path.join(path_to_block, block_dir)
+                    chdir(target_dir)
+                    res = self._subprocess_call("git checkout {}".format(tag))
+                    result = self._get_subprocess_return(res, "tag checkout")
+                    if result["status"] != "ok":
+                        self.logger.error(
+                            "Failed to checkout specified tag: '{}'".
+                            format(result["status"]))
+                        # restoring original current directory
+                        raise ValueError(result["status"])
+
+                self.logger.info("Cloning block from: {0} was a success".
+                                 format(url))
+                # save it so that it is available next time if needed
+                self._save_cloned_block(original_url,
+                                        tag,
+                                        branch,
+                                        original_path_to_block)
+            else:
+                raise ValueError(result["status"])
+        finally:
             # restoring original current directory
             chdir(directory_to_restore)
-            return {"status": "skipped"}
-        self.logger.info("Cloning Git repository into directory: {}"
-                         .format(block_dir))
 
-        # Get block from git
-        if branch is not None:
-            self.logger.info(
-                "Cloning {} branch for git repository: {}".format(branch, url))
-            res = self._subprocess_call(
-                "git clone --recursive {} -b {}".format(url, branch))
-        else:
-            self.logger.info(
-                "Cloning default branch for git repository: {}".format(url))
-            res = self._subprocess_call(
-                "git clone --recursive {}".format(url))
-
-        # Update pip requirements
-        if res == 0:
-            self.pip_install_req("{0}/{1}".format(path_to_block, block_dir))
-
-        # Get process return
-        result = self._get_subprocess_return(res, "cloning block")
-        if result["status"] == "ok":
-            if tag:
-                self.logger.info("Checking out tag: {}".format(tag))
-
-                # cd to folder and check out tag
-                target_dir = path.join(path_to_block, block_dir)
-                chdir(target_dir)
-                res = self._subprocess_call("git checkout {}".format(tag))
-                result = self._get_subprocess_return(res, "tag checkout")
-                if result["status"] != "ok":
-                    self.logger.error('Failed to checkout specified tag: {}'.
-                                      format(result["status"]))
-                    # restoring original current directory
-                    chdir(directory_to_restore)
-                    return result
-
-            self.logger.info("Cloning block from: {0} was a success".
-                             format(url))
-            # save it so that it is available next time if needed
-            self._save_cloned_block(original_url,
-                                    tag,
-                                    branch,
-                                    original_path_to_block)
-
-        # restoring original current directory
-        chdir(directory_to_restore)
         return result
 
     def pip_install_req(self, path_to_block):
@@ -439,41 +444,43 @@ class ProjectManager(CoreComponent):
         # save directory to be restored
         directory_to_restore = path.abspath(path.curdir)
 
-        blocks_paths = self._get_abs_blocks_paths()
-        for blocks_path in blocks_paths:
-            updates_in_path = False
-            blocks_path_structure = self._get_block_path_structure(blocks_path)
-            for block_structure in blocks_path_structure:
-                if blocks and block_structure["name"] not in blocks:
-                    # update was not requested for this block
-                    continue
+        # start a try block to ensure restoring current directory
+        try:
+            blocks_paths = self._get_abs_blocks_paths()
+            for blocks_path in blocks_paths:
+                updates_in_path = False
+                blocks_path_structure = self._get_block_path_structure(blocks_path)
+                for block_structure in blocks_path_structure:
+                    if blocks and block_structure["name"] not in blocks:
+                        # update was not requested for this block
+                        continue
 
-                if block_structure["type"] == "directory":
-                    # cd to block directory
-                    chdir(path.join(blocks_path, block_structure["name"]))
-                else:
-                    chdir(blocks_path)
+                    if block_structure["type"] == "directory":
+                        # cd to block directory
+                        chdir(path.join(blocks_path, block_structure["name"]))
+                    else:
+                        chdir(blocks_path)
 
-                # update block
-                result = self._get_subprocess_return(
+                    # update block
+                    result = self._get_subprocess_return(
+                        self._subprocess_call(
+                            "git fetch origin --progress --prune"),
+                        "updating block")
+                    results.append({block_structure["name"]: result})
+                    updates_in_path = True
+
+                # update submodules if there were any updates in path
+                if updates_in_path:
                     self._subprocess_call(
-                        "git fetch origin --progress --prune"),
-                    "updating block")
-                results.append({block_structure["name"]: result})
-                updates_in_path = True
+                        "git submodule update --init --recursive")
 
-            # update submodules if there were any updates in path
-            if updates_in_path:
-                self._subprocess_call(
-                    "git submodule update --init --recursive")
-
-        # restoring original current directory
-        chdir(directory_to_restore)
-
-        if len(blocks):
-            # warning about requested blocks that were not found
-            self.logger.warning("Blocks: {0} are not installed".
-                                format(blocks))
+            if len(blocks):
+                # warning about requested blocks that were not found
+                self.logger.warning("Blocks: {0} are not installed".
+                                    format(blocks))
+        finally:
+            # restoring original current directory
+            chdir(directory_to_restore)
 
         return results
 
@@ -496,7 +503,7 @@ class ProjectManager(CoreComponent):
         elif result > 0:
             result = {"status":
                       "while {0}, command failed with "
-                      "return code: {0}".format(message, result)}
+                      "return code: {1}".format(message, result)}
         else:
             # call is a success
             result = {"status": "ok"}

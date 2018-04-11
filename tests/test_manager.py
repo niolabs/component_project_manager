@@ -157,8 +157,9 @@ class TestProjectManager(NIOCoreTestCase):
         listdir_patch.return_value = ['foo']
         isdir_patch.return_value = True
         url = "block_template"
-        result = project_manager.clone_block(url)
-        self.assertEqual(result["status"], "skipped")
+        with self.assertRaises(ValueError):
+            result = project_manager.clone_block(url)
+
         self.assertFalse(subprocess_patch.call_count)
         # assert that previous directory was restored
         self.assertEqual(chdir_patch.call_count, 2)
@@ -263,9 +264,9 @@ class TestProjectManager(NIOCoreTestCase):
         prev_directory = path.abspath(path.curdir)
 
         url = "block_template"
-        result = project_manager.clone_block(url)
         # assert failure to clone
-        self.assertNotEqual(result["status"], "ok")
+        with self.assertRaises(ValueError):
+            project_manager.clone_block(url)
 
         cmd = "git clone --recursive " \
             "git://github.com/nio-blocks/block_template.git"
