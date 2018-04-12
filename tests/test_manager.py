@@ -1,4 +1,4 @@
-from os import path, chdir
+from os import path
 
 from unittest.mock import ANY, patch, Mock
 from niocore.core.context import CoreContext
@@ -157,14 +157,18 @@ class TestProjectManager(NIOCoreTestCase):
         listdir_patch.return_value = ['foo']
         isdir_patch.return_value = True
         url = "block_template"
-        with self.assertRaises(ValueError):
-            result = project_manager.clone_block(url)
-
+        result = project_manager.clone_block(url, error_on_existing_repo=False)
+        self.assertNotEqual(result["status"], "ok")
         self.assertFalse(subprocess_patch.call_count)
         # assert that previous directory was restored
         self.assertEqual(chdir_patch.call_count, 2)
         self.assertEqual(chdir_patch.call_args_list[-1][0][0],
                          self._root_path)
+        with self.assertRaises(ValueError):
+            project_manager.clone_block(url, error_on_existing_repo=True)
+        # assert error_on_existing_repo default
+        with self.assertRaises(ValueError):
+            project_manager.clone_block(url)
 
     @patch(ProjectManager.__module__ + ".chdir")
     @patch(ProjectManager.__module__ + ".subprocess")
@@ -305,7 +309,10 @@ class TestProjectManager(NIOCoreTestCase):
 
         project_manager._subprocess_call.reset_mock()
         results = project_manager.update_block(["invalid_block"])
-        self.assertEqual(len(results), 0)
+        self.assertEqual(len(results), 1)
+        self.assertIn("not installed", results[0])
+        self.assertEqual(len(results[0]["not installed"]), 1)
+        self.assertEqual(results[0]["not installed"][0], "invalid_block")
         self.assertEqual(project_manager._subprocess_call.call_count, 0)
 
     def test_update_all(self):
@@ -322,7 +329,7 @@ class TestProjectManager(NIOCoreTestCase):
         results = project_manager.update_block([])
 
         # assert that all blocks in project_path were updated
-        self.assertEqual(len(results), 3)
+        self.assertEqual(len(results), 4)
         self.assertIn({"twitter": {"status": "ok"}}, results)
         self.assertIn({"mongo": {"status": "ok"}}, results)
         self.assertIn({"dummy_block": {"status": "ok"}}, results)
