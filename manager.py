@@ -69,7 +69,15 @@ class ProjectManager(CoreComponent):
         self._rest_manager = self.get_dependency("RESTManager")
 
         # Clone down any blocks that were configured in the instance settings
-        self._clone_configured_blocks()
+        try:
+            self._clone_configured_blocks()
+        # catch the two known exceptions that a corrupt/invalid file might throw
+        except (TypeError, ValueError):
+            # log and allow nio to continue
+            self.logger.exception(
+                "An error has occurred while making sure installed block source"
+                " files are present, please verify that 'blocks.cfg' entries"
+                " are valid")
 
     def start(self):
         """Starts component
