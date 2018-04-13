@@ -328,11 +328,17 @@ class TestProjectManager(NIOCoreTestCase):
 
         results = project_manager.update_block([])
 
-        # assert that all blocks in project_path were updated
+        # there are four entries, one for each block updated
+        # and one entry for possible blocks called for an update
+        # that were not even installed in the system
         self.assertEqual(len(results), 4)
+        # assert that all blocks in project_path were updated
         self.assertIn({"twitter": {"status": "ok"}}, results)
         self.assertIn({"mongo": {"status": "ok"}}, results)
         self.assertIn({"dummy_block": {"status": "ok"}}, results)
+        # assert 'not installed' blocks entry is empty (for a non-empty
+        # 'not installed' entry see test_update_invalid_block
+        self.assertIn({"not installed": []}, results)
 
         # assert fetch and update submodule calls
         self.assertEqual(project_manager._subprocess_call.call_count, 4)
