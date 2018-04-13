@@ -136,7 +136,8 @@ class ProjectManager(CoreComponent):
             # exists in this project then it will NOT be overwritten and the
             # branch will not be switched
             self.clone_block(
-                repo, tag=tag, branch=branch, path_to_block=path_to_block
+                repo, tag=tag, branch=branch, path_to_block=path_to_block,
+                error_on_existing_repo=False
             )
 
     def _parse_block(self, block):
@@ -289,7 +290,8 @@ class ProjectManager(CoreComponent):
 
         return removed
 
-    def clone_block(self, url, tag=None, path_to_block=None, branch=None):
+    def clone_block(self, url, tag=None, path_to_block=None, branch=None,
+                    error_on_existing_repo=True):
         """Clones a block from github's nio-blocks repository
 
         Note: if a repository already exists at the given clone location
@@ -308,6 +310,8 @@ class ProjectManager(CoreComponent):
                 "blocks" entry from environment configuration
 
             branch: branch to clone (ignored if None)
+            error_on_existing_repo (bool): if block is requested and it
+                already exists
 
         Returns:
             Operation status as a dictionary
@@ -319,34 +323,75 @@ class ProjectManager(CoreComponent):
 
         url = self._process_url(url)
 
-        # Go to target path
+        # Determine target path
         if not path_to_block:
             blocks_paths = self._get_abs_blocks_paths()
             if not blocks_paths:
                 raise RuntimeError("Could not get a valid nio blocks path")
             # if no path specified, grab last path to blocks
             path_to_block = blocks_paths[len(blocks_paths)-1]
+
+        # save directory to be restored
+        directory_to_restore = path.abspath(path.curdir)
         try:
-            # save directory to be restored
-            directory_to_restore = path.abspath(path.curdir)
             chdir(path_to_block)
         except FileNotFoundError:
-            self.logger.error("Path '{0}' is invalid".format(path_to_block))
-            raise
+            msg = "Target block path '{0}' is invalid".format(path_to_block)
+            self.logger.error(msg)
+            raise ValueError(msg)
 
         # Get the directory that this will be cloned into
         block_dir, _ = path.splitext(path.basename(url))
-        # check if dir exists and is not empty
+        # check if relative path dir exists and if it is not empty
         if path.isdir(block_dir) and len(listdir(block_dir)):
-            self.logger.info("{} Already exists and is not empty, skipping"
-                             .format(block_dir))
-            # restoring original current directory
             chdir(directory_to_restore)
-            return {"status": "skipped"}
+            msg = "'{}' folder already exists and it is not empty, skipping".\
+                  format(block_dir)
+            if error_on_existing_repo:
+                raise ValueError(msg)
+            else:
+                return {"status": msg}
+
         self.logger.info("Cloning Git repository into directory: {}"
                          .format(block_dir))
+        res = self._clone_block_from_git(url, branch)
+        result = self._get_subprocess_return(res, "cloning block")
+        if result["status"] == "ok":
+            # Update pip requirements
+            self.pip_install_req("{0}/{1}".format(path_to_block, block_dir))
 
-        # Get block from git
+            if tag:
+                self.logger.info("Checking out tag: {}".format(tag))
+
+                # cd to folder and check out tag
+                target_dir = path.join(path_to_block, block_dir)
+                chdir(target_dir)
+                res = self._subprocess_call("git checkout {}".format(tag))
+                result = self._get_subprocess_return(res, "tag checkout")
+                if result["status"] != "ok":
+                    chdir(directory_to_restore)
+                    self.logger.error(
+                        "Failed to checkout specified tag: '{}'".
+                        format(result["status"]))
+                    # restoring original current directory
+                    raise ValueError(result["status"])
+
+            self.logger.info("Cloning block from: {0} was a success".
+                             format(url))
+            # save it so that it is available next time if needed
+            self._save_cloned_block(original_url,
+                                    tag,
+                                    branch,
+                                    original_path_to_block)
+        else:
+            chdir(directory_to_restore)
+            raise ValueError(result["status"])
+
+        # restoring original current directory
+        chdir(directory_to_restore)
+        return result
+
+    def _clone_block_from_git(self, url, branch=None):
         if branch is not None:
             self.logger.info(
                 "Cloning {} branch for git repository: {}".format(branch, url))
@@ -357,40 +402,7 @@ class ProjectManager(CoreComponent):
                 "Cloning default branch for git repository: {}".format(url))
             res = self._subprocess_call(
                 "git clone --recursive {}".format(url))
-
-        # Update pip requirements
-        if res == 0:
-            self.pip_install_req("{0}/{1}".format(path_to_block, block_dir))
-
-        # Get process return
-        result = self._get_subprocess_return(res, "cloning block")
-        if result["status"] == "ok":
-            if tag:
-                self.logger.info("Checking out tag: {}".format(tag))
-
-                # cd to folder and check out tag
-                target_dir = path.join(path_to_block, block_dir)
-                chdir(target_dir)
-                res = self._subprocess_call("git checkout {}".format(tag))
-                result = self._get_subprocess_return(res, "tag checkout")
-                if result["status"] != "ok":
-                    self.logger.error('Failed to checkout specified tag: {}'.
-                                      format(result["status"]))
-                    # restoring original current directory
-                    chdir(directory_to_restore)
-                    return result
-
-            self.logger.info("Cloning block from: {0} was a success".
-                             format(url))
-            # save it so that it is available next time if needed
-            self._save_cloned_block(original_url,
-                                    tag,
-                                    branch,
-                                    original_path_to_block)
-
-        # restoring original current directory
-        chdir(directory_to_restore)
-        return result
+        return res
 
     def pip_install_req(self, path_to_block):
         """Updates PIP requirements.txt file for a block
@@ -435,14 +447,30 @@ class ProjectManager(CoreComponent):
     def update_block(self, blocks):
         """Pulls down block latest version and updates submodules
 
+        This method potentially updates all blocks in the system when incoming
+        blocks parameter is an empty list.
+
+        Additionally if 'blocks' list is not empty, and contains blocks that
+        are not in the system, this method keeps track of such blocks and
+        reports them as not installed.
+
         Args:
-            blocks: block folder
+            blocks (list): blocks to update, if empty, all existing blocks are updated
 
         Returns:
-            Operation status as a dictionary
+            Operation status as a list with the following format:
+            [
+                {[block1]: {"status": [block1 update status]}},
+                {[block2]: {"status": [block2 update status]]}},
+                ...
+                {[blockN]: {"status": [blockN update status]]}},
+                {"not installed": [list of blocks requested but not installed}
+            ]
         """
 
         results = []
+        # keep a list of blocks requested but potentially not installed
+        blocks_not_installed = deepcopy(blocks)
 
         # save directory to be restored
         directory_to_restore = path.abspath(path.curdir)
@@ -452,9 +480,13 @@ class ProjectManager(CoreComponent):
             updates_in_path = False
             blocks_path_structure = self._get_block_path_structure(blocks_path)
             for block_structure in blocks_path_structure:
-                if blocks and block_structure["name"] not in blocks:
-                    # update was not requested for this block
-                    continue
+                if blocks:
+                    if block_structure["name"] not in blocks:
+                        # update was not requested for this block
+                        continue
+                    else:
+                        # make sure block is counted as updated
+                        blocks_not_installed.remove(block_structure["name"])
 
                 if block_structure["type"] == "directory":
                     # cd to block directory
@@ -478,10 +510,11 @@ class ProjectManager(CoreComponent):
         # restoring original current directory
         chdir(directory_to_restore)
 
-        if len(blocks):
+        if len(blocks_not_installed):
             # warning about requested blocks that were not found
             self.logger.warning("Blocks: {0} are not installed".
-                                format(blocks))
+                                format(blocks_not_installed))
+        results.append({"not installed": blocks_not_installed})
 
         return results
 
@@ -504,7 +537,7 @@ class ProjectManager(CoreComponent):
         elif result > 0:
             result = {"status":
                       "while {0}, command failed with "
-                      "return code: {0}".format(message, result)}
+                      "return code: {1}".format(message, result)}
         else:
             # call is a success
             result = {"status": "ok"}

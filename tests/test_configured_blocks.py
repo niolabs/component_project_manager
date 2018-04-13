@@ -47,6 +47,8 @@ class TestProjectManager(NIOCoreTestCase):
                     break
             self.assertTrue(block_found)
 
-    def _my_clone_block(self, url, tag=None, path_to_block=None, branch=None):
+    def _my_clone_block(self, url, tag=None, path_to_block=None, branch=None,
+                        error_on_existing_repo=True):
         self._cloned_blocks.append(url)
-        self._orig_clone_block(url, tag, path_to_block, branch)
+        self._orig_clone_block(url, tag, path_to_block, branch,
+                               error_on_existing_repo)

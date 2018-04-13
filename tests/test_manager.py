@@ -1,4 +1,4 @@
-from os import path, chdir
+from os import path
 
 from unittest.mock import ANY, patch, Mock
 from niocore.core.context import CoreContext
@@ -157,13 +157,18 @@ class TestProjectManager(NIOCoreTestCase):
         listdir_patch.return_value = ['foo']
         isdir_patch.return_value = True
         url = "block_template"
-        result = project_manager.clone_block(url)
-        self.assertEqual(result["status"], "skipped")
+        result = project_manager.clone_block(url, error_on_existing_repo=False)
+        self.assertNotEqual(result["status"], "ok")
         self.assertFalse(subprocess_patch.call_count)
         # assert that previous directory was restored
         self.assertEqual(chdir_patch.call_count, 2)
         self.assertEqual(chdir_patch.call_args_list[-1][0][0],
                          self._root_path)
+        with self.assertRaises(ValueError):
+            project_manager.clone_block(url, error_on_existing_repo=True)
+        # assert error_on_existing_repo default
+        with self.assertRaises(ValueError):
+            project_manager.clone_block(url)
 
     @patch(ProjectManager.__module__ + ".chdir")
     @patch(ProjectManager.__module__ + ".subprocess")
@@ -263,9 +268,9 @@ class TestProjectManager(NIOCoreTestCase):
         prev_directory = path.abspath(path.curdir)
 
         url = "block_template"
-        result = project_manager.clone_block(url)
         # assert failure to clone
-        self.assertNotEqual(result["status"], "ok")
+        with self.assertRaises(ValueError):
+            project_manager.clone_block(url)
 
         cmd = "git clone --recursive " \
             "git://github.com/nio-blocks/block_template.git"
@@ -304,7 +309,10 @@ class TestProjectManager(NIOCoreTestCase):
 
         project_manager._subprocess_call.reset_mock()
         results = project_manager.update_block(["invalid_block"])
-        self.assertEqual(len(results), 0)
+        self.assertEqual(len(results), 1)
+        self.assertIn("not installed", results[0])
+        self.assertEqual(len(results[0]["not installed"]), 1)
+        self.assertEqual(results[0]["not installed"][0], "invalid_block")
         self.assertEqual(project_manager._subprocess_call.call_count, 0)
 
     def test_update_all(self):
@@ -320,11 +328,17 @@ class TestProjectManager(NIOCoreTestCase):
 
         results = project_manager.update_block([])
 
+        # there are four entries, one for each block updated
+        # and one entry for possible blocks called for an update
+        # that were not even installed in the system
+        self.assertEqual(len(results), 4)
         # assert that all blocks in project_path were updated
-        self.assertEqual(len(results), 3)
         self.assertIn({"twitter": {"status": "ok"}}, results)
         self.assertIn({"mongo": {"status": "ok"}}, results)
         self.assertIn({"dummy_block": {"status": "ok"}}, results)
+        # assert 'not installed' blocks entry is empty (for a non-empty
+        # 'not installed' entry see test_update_invalid_block
+        self.assertIn({"not installed": []}, results)
 
         # assert fetch and update submodule calls
         self.assertEqual(project_manager._subprocess_call.call_count, 4)
