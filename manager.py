@@ -45,6 +45,7 @@ class ProjectManager(CoreComponent):
 
         # dependency components
         self._rest_manager = None
+        self._block_manager = None
 
         # allocate persistence instance to use to load/save cloned blocks
         self._persistence = Persistence()
@@ -65,8 +66,9 @@ class ProjectManager(CoreComponent):
 
         super().configure(context)
 
-        # Register dependencies to rest and service manager
+        # Register dependencies to rest and block manager
         self._rest_manager = self.get_dependency("RESTManager")
+        self._block_manager = self.get_dependency("BlockManager")
 
         # Clone down any blocks that were configured in the instance settings
         try:
@@ -378,6 +380,16 @@ class ProjectManager(CoreComponent):
 
             self.logger.info("Cloning block from: {0} was a success".
                              format(url))
+            # validate block's modules
+            valid, errors = \
+                self._block_manager.validate_block_folder(block_dir)
+            if not valid:
+                # clean up/remove just downloaded block folder
+                rmtree(path.join(path_to_block, block_dir))
+
+                chdir(directory_to_restore)
+                raise RuntimeError(errors)
+
             # save it so that it is available next time if needed
             self._save_cloned_block(original_url,
                                     tag,

@@ -13,6 +13,13 @@ class TestProjectManager(NIOCoreTestCase):
     def test_clone_blocks_not_ok(self, subprocess_patch, chdir_patch):
         """ Asserts upon configuration configured blocks are cloned
         """
+        def get_dependency(component):
+            if component == "BlockManager":
+                block_manager = Mock()
+                # allow block_folder to validate fine
+                block_manager.validate_block_folder.return_value = (True, {})
+                return block_manager
+            return Mock()
 
         blocks_count = 10
         blocks = []
@@ -31,6 +38,7 @@ class TestProjectManager(NIOCoreTestCase):
         project_manager._get_abs_blocks_paths.return_value = ["path1"]
 
         self._cloned_blocks = []
+        project_manager.get_dependency = get_dependency
         project_manager.configure(Mock())
 
         # reload blocks and assert that the list kept the count
