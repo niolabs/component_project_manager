@@ -182,6 +182,11 @@ class TestProjectManager(NIOCoreTestCase):
         project_manager.get_dependency = Mock()
         project_manager.configure(CoreContext([], []))
 
+        # allow block_folder to validate fine
+        block_manager = Mock()
+        block_manager.validate_block_folder.return_value = (True, {})
+        project_manager._block_manager = block_manager
+
         # specify just block as url
         url = "block_template"
         result = project_manager.clone_block(url)
@@ -348,3 +353,37 @@ class TestProjectManager(NIOCoreTestCase):
             "git fetch origin --progress --prune")
 
         self.assertEqual(prev_directory, path.abspath(path.curdir))
+
+    @patch(ProjectManager.__module__ + ".chdir")
+    @patch(ProjectManager.__module__ + ".subprocess")
+    def test_clone_blocks_fail_to_validate(self, subprocess_patch, chdir_patch):
+        """ Makes sure expected calls happen when block fails to validate
+        """
+        subprocess_patch.call = Mock(return_value=0)
+
+        project_manager = ProjectManager()
+        project_manager._save_cloned_block = Mock()
+        project_manager.get_dependency = Mock()
+        project_manager._remove_dir = Mock()
+        project_manager.configure(CoreContext([], []))
+
+        # fail to validate block_folder
+        block_manager = Mock()
+        block_manager.validate_block_folder.return_value = \
+            (False, {"block_module": "reason"})
+        project_manager._block_manager = block_manager
+
+        url = "block_template"
+        with self.assertRaises(RuntimeError):
+            project_manager.clone_block(url)
+
+        # assert call to validate block took place
+        self.assertEqual(block_manager.validate_block_folder.call_count, 1)
+        # assert call to remove 'cloned block' took place
+        self.assertEqual(project_manager._remove_dir.call_count, 1)
+        # block was not saved
+        self.assertEqual(project_manager._save_cloned_block.call_count, 0)
+
+        # assert two chdir calls (one to set folder to clone into
+        # and one to restore)
+        self.assertEqual(chdir_patch.call_count, 2)
