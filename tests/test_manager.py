@@ -354,11 +354,9 @@ class TestProjectManager(NIOCoreTestCase):
 
         self.assertEqual(prev_directory, path.abspath(path.curdir))
 
-    @patch(ProjectManager.__module__ + ".rmtree")
     @patch(ProjectManager.__module__ + ".chdir")
     @patch(ProjectManager.__module__ + ".subprocess")
-    def test_clone_blocks_fail_to_validate(self, subprocess_patch, chdir_patch,
-                                           rmtree_patch):
+    def test_clone_blocks_fail_to_validate(self, subprocess_patch, chdir_patch):
         """ Makes sure expected calls happen when block fails to validate
         """
         subprocess_patch.call = Mock(return_value=0)
@@ -366,6 +364,7 @@ class TestProjectManager(NIOCoreTestCase):
         project_manager = ProjectManager()
         project_manager._save_cloned_block = Mock()
         project_manager.get_dependency = Mock()
+        project_manager._remove_dir = Mock()
         project_manager.configure(CoreContext([], []))
 
         # fail to validate block_folder
@@ -381,7 +380,7 @@ class TestProjectManager(NIOCoreTestCase):
         # assert call to validate block took place
         self.assertEqual(block_manager.validate_block_folder.call_count, 1)
         # assert call to remove 'cloned block' took place
-        self.assertEqual(rmtree_patch.call_count, 1)
+        self.assertEqual(project_manager._remove_dir.call_count, 1)
         # block was not saved
         self.assertEqual(project_manager._save_cloned_block.call_count, 0)
 
