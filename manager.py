@@ -385,7 +385,7 @@ class ProjectManager(CoreComponent):
                 self._block_manager.validate_block_folder(block_dir)
             if not valid:
                 # clean up/remove just downloaded block folder
-                rmtree(path.join(path_to_block, block_dir))
+                self._remove_dir(path.join(path_to_block, block_dir))
 
                 chdir(directory_to_restore)
                 raise RuntimeError(errors)
