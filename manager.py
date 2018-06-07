@@ -137,10 +137,17 @@ class ProjectManager(CoreComponent):
             # Clone the repo with the configured branch. If the block already
             # exists in this project then it will NOT be overwritten and the
             # branch will not be switched
-            self.clone_block(
-                repo, tag=tag, branch=branch, path_to_block=path_to_block,
-                error_on_existing_repo=False
-            )
+            try:
+                self.clone_block(
+                    repo, tag=tag, branch=branch, path_to_block=path_to_block,
+                    error_on_existing_repo=False
+                )
+            except (TypeError, ValueError, RuntimeError):
+                # log and allow cloning to continue
+                self.logger.exception(
+                    "An error has occurred while making sure installed block "
+                    "source files are present, please verify that 'blocks.cfg' "
+                    "entries are valid")
 
     def _parse_block(self, block):
         """ Parse a configured block into a URL and a branch
