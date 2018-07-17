@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 from nio.testing.modules.security.module import TestingSecurityModule
 from nio.modules.web.http import Request, Response
+from niocore.core.block.cloner import BlockCloner
 
 from ..handler import ProjectManagerHandler
 from ..manager import ProjectManager
@@ -38,9 +39,9 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
             handler.on_get(request, response)
 
     def test_on_delete(self):
-        project_manager = ProjectManager()
-        project_manager.remove_blocks = MagicMock(return_value={})
-        handler = ProjectManagerHandler("", project_manager)
+        block_cloner = BlockCloner()
+        block_cloner.remove_blocks = MagicMock(return_value={})
+        handler = ProjectManagerHandler("", block_cloner)
 
         params = {"identifier": "blocks",
                   "twitter, filter": ""}
@@ -48,10 +49,10 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
         request.get_params.return_value = params
         response = MagicMock(spec=Response)
         handler.on_delete(request, response)
-        project_manager.remove_blocks.assert_called_with(
+        block_cloner.remove_blocks.assert_called_with(
             ['twitter', 'filter'])
 
-        project_manager.remove_blocks.reset_mock()
+        block_cloner.remove_blocks.reset_mock()
         params = {"identifier": "blocks",
                   "twitter": "",
                   "filter": ""}
@@ -61,15 +62,15 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
         handler.on_delete(request, response)
         # Don't know what order we will process the dictionary keys,
         # make sure both blocks were removed and nothing more
-        call_args_removed = project_manager.remove_blocks.call_args[0][0]
+        call_args_removed = block_cloner.remove_blocks.call_args[0][0]
         self.assertIn('twitter', call_args_removed)
         self.assertIn('filter', call_args_removed)
         self.assertEqual(len(call_args_removed), 2)
 
     def test_on_delete_invalid_params(self):
-        project_manager = ProjectManager()
-        project_manager.remove_blocks = MagicMock(return_value={})
-        handler = ProjectManagerHandler("", project_manager)
+        block_cloner = MagicMock()
+        block_cloner.remove_blocks = MagicMock(return_value={})
+        handler = ProjectManagerHandler("", block_cloner)
 
         params = {"identifier": "invalid_identifier",
                   "twitter, filter": ""}
