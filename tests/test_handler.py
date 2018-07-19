@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 from nio.testing.modules.security.module import TestingSecurityModule
 from nio.modules.web.http import Request, Response
-from niocore.core.block.cloner import BlockCloner
 
 from ..handler import ProjectManagerHandler
 from ..manager import ProjectManager
@@ -39,7 +38,8 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
             handler.on_get(request, response)
 
     def test_on_delete(self):
-        block_cloner = BlockCloner()
+        block_cloner = MagicMock()
+        block_cloner.get_blocks = MagicMock(return_value=['twitter', 'filter'])
         block_cloner.remove_blocks = MagicMock(return_value={})
         handler = ProjectManagerHandler("", block_cloner)
 

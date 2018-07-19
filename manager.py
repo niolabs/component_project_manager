@@ -38,7 +38,6 @@ class ProjectManager(CoreComponent):
 
         # dependency components
         self._rest_manager = None
-        self._block_cloner = None
 
         # allocate persistence instance to use to load/save cloned blocks
         self._persistence = Persistence()
@@ -60,7 +59,6 @@ class ProjectManager(CoreComponent):
 
         # Register dependencies to rest and block manager
         self._rest_manager = self.get_dependency("RESTManager")
-        self._block_cloner = BlockCloner(self.get_dependency("BlockManager"))
 
     def start(self):
         """Starts component
@@ -72,7 +70,7 @@ class ProjectManager(CoreComponent):
 
         # create REST specific handlers
         self._handler = ProjectManagerHandler("/project",
-                                              self._block_cloner)
+                                              BlockCloner)
 
         # Add handler to WebServer
         self._rest_manager.add_web_handler(self._handler)
