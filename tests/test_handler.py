@@ -17,10 +17,11 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
             return super().get_module(module_name)
 
     def test_on_get(self):
+        project_manager = MagicMock()
         with patch.object(BlockCloner,
                           "get_blocks_structure") as get_struct_patch:
             get_struct_patch.return_value = {}
-            handler = ProjectManagerHandler("")
+            handler = ProjectManagerHandler("", project_manager)
 
             request = MagicMock(spec=Request)
             request.get_params.return_value = {"identifier": "blocks"}
@@ -28,8 +29,37 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
             handler.on_get(request, response)
             self.assertEqual(get_struct_patch.call_count, 1)
 
+        # refresh request
+        request = MagicMock(spec=Request)
+        request.get_params.return_value = {"identifier": "refresh",
+                                           "cfg_type": "block"}
+        response = MagicMock(spec=Response)
+        handler.on_get(request, response)
+        self.assertEqual(
+            project_manager.trigger_config_change_hook.call_count, 1)
+
+        # invalid refresh request
+        project_manager.reset_mock()
+        request = MagicMock(spec=Request)
+        request.get_params.return_value = {"identifier": "refresh",
+                                           "cfg_type": "invalid"}
+        response = MagicMock(spec=Response)
+        with self.assertRaises(ValueError):
+            handler.on_get(request, response)
+
+        # invalid request
+        mock_req = MagicMock(spec=Request)
+        mock_req.get_params.return_value = {"identifier": "invalid"}
+        handler = ProjectManagerHandler("", project_manager)
+
+        # Verify error is raised with incorrect identifier
+        request = mock_req
+        response = MagicMock()
+        with self.assertRaises(ValueError):
+            handler.on_get(request, response)
+
     def test_on_get_invalid_params(self):
-        handler = ProjectManagerHandler("")
+        handler = ProjectManagerHandler("", MagicMock())
 
         request = MagicMock(spec=Request)
         request.get_params.return_value = {"identifier": "invalid id"}
@@ -42,7 +72,7 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
                           "remove_blocks") as remove_blocks_patch:
             remove_blocks_patch.return_value = {}
 
-            handler = ProjectManagerHandler("")
+            handler = ProjectManagerHandler("", MagicMock())
 
             params = {"identifier": "blocks",
                       "twitter, filter": ""}
@@ -73,7 +103,7 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
                           "remove_blocks") as remove_blocks_patch:
             remove_blocks_patch.return_value = {}
 
-            handler = ProjectManagerHandler("")
+            handler = ProjectManagerHandler("", MagicMock())
 
             params = {"identifier": "invalid_identifier",
                       "twitter, filter": ""}

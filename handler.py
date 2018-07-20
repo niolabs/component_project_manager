@@ -8,35 +8,34 @@ from nio.modules.security.access import ensure_access
 from nio.util.logging import get_nio_logger
 from nio.modules.web import RESTHandler
 from niocore.core.block.cloner import BlockCloner
+from niocore.configuration import CfgType
 
 
 class ProjectManagerHandler(RESTHandler):
     """ Handles 'project' API requests
     """
 
-    def __init__(self, route):
+    def __init__(self, route, project_manager):
         super().__init__(route)
+        self._project_manager = project_manager
         self.logger = get_nio_logger("ProjectManagerHandler")
 
     def on_get(self, request, response, *args, **kwargs):
-        """ API endpoint to retrieve current block structure
+        """ API endpoint to retrieve current block structure or refresh
+        instance configuration
 
         Example:
-            http://[host]:[port]/project/blocks
-            http://[host]:[port]/project/blocks?branches=1
-
+            Retrieving block structure
+                http://[host]:[port]/project/blocks
+                http://[host]:[port]/project/blocks?branches=1
+            Refreshing instance configuration
+                http://[host]:[port]/project/refresh?cfg_type=service
+                http://[host]:[port]/project/refresh?cfg_type=block
+                http://[host]:[port]/project/refresh?cfg_type=all
         """
 
-        # Ensure instance "read" access in order to retrieve project blocks
-        # structure
-        ensure_access("instance", "read")
-
-        # Log
         params = request.get_params()
         self.logger.debug("on_get, params: {0}".format(params))
-
-        # Result default to none
-        result = None
 
         # What route?
         if "identifier" in params:
@@ -44,21 +43,41 @@ class ProjectManagerHandler(RESTHandler):
             # -- Blocks
             if params["identifier"] == "blocks":
 
+                # Ensure instance "read" access in order to retrieve project
+                # blocks structure
+                ensure_access("instance", "read")
                 # -- Get branch info
                 get_branch_info = bool(params.get("branches", 0))
 
                 # -- -- Get block structure
-                result = BlockCloner.get_blocks_structure(
-                    get_branch_info
-                )
+                result = \
+                    BlockCloner.get_blocks_structure(get_branch_info)
+                if result is not None:
+                    response.set_header('Content-Type', 'application/json')
+                    response.set_body(json.dumps(result))
+                else:
+                    raise ValueError("GET request with params: {0} is invalid".
+                                     format(params))
+            # -- Refresh
+            elif params["identifier"] == "refresh":
 
-        # Result
-        if result is not None:
-            response.set_header('Content-Type', 'application/json')
-            response.set_body(json.dumps(result))
-        else:
-            raise ValueError("GET request with params: {0} is invalid".
-                             format(params))
+                # Ensure instance "execute" access in order to refresh configs
+                ensure_access("instance", "execute")
+                cfg_type = params.get('cfg_type', CfgType.all.name)
+
+                for current_enum in CfgType:
+                    if current_enum.name == cfg_type:
+                        self._project_manager.trigger_config_change_hook(
+                            current_enum
+                        )
+                        return
+                msg = "Invalid 'config' refresh type: {0}".format(cfg_type)
+                self.logger.warning(msg)
+                raise ValueError(msg)
+            else:
+                msg = "Unsupported request: {0}".format(params["identifier"])
+                self.logger.warning(msg)
+                raise ValueError(msg)
 
     def on_delete(self, request, response):
         """ API endpoint to handle 'delete' block from repository

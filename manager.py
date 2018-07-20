@@ -7,6 +7,7 @@ from nio.modules.persistence import Persistence
 from nio.util.versioning.dependency import DependsOn
 from niocore.core.component import CoreComponent
 from nio import discoverable
+from niocore.core.hooks import CoreHooks
 
 from .handler import ProjectManagerHandler
 from . import __version__ as component_version
@@ -68,7 +69,7 @@ class ProjectManager(CoreComponent):
         super().start()
 
         # create REST specific handlers
-        self._handler = ProjectManagerHandler("/project")
+        self._handler = ProjectManagerHandler("/project", self)
 
         # Add handler to WebServer
         self._rest_manager.add_web_handler(self._handler)
@@ -82,3 +83,10 @@ class ProjectManager(CoreComponent):
         # Remove handler from WebServer
         self._rest_manager.remove_web_handler(self._handler)
         super().stop()
+
+    def trigger_config_change_hook(self, cfg_type):
+        """ Executes hook indicating configuration changes
+        """
+        self.logger.debug("Triggering configuration change hook")
+        CoreHooks.run('configuration_change', cfg_type)
+
