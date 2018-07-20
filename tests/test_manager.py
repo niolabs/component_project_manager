@@ -7,6 +7,9 @@ from niocore.util.environment import NIOEnvironment
 from niocore.testing.test_case import NIOCoreTestCase
 
 from ..manager import ProjectManager
+from niocore.core.hooks import CoreHooks
+from nio.testing.condition import ConditionWaiter
+from threading import Event
 
 
 class TestProjectManager(NIOCoreTestCase):
@@ -49,3 +52,23 @@ class TestProjectManager(NIOCoreTestCase):
         self.assertTrue(
             isinstance(rest_manager.add_web_handler.call_args[0][0],
                        RESTHandler))
+
+    def test_hooks_called(self):
+        # Verify hook is called when callback is executed
+        self._config_change_called = False
+        CoreHooks.attach("configuration_change", self._on_config_change)
+        manager = ProjectManager()
+        manager.trigger_config_change_hook('all')
+
+        # handle async hook execution
+        event = Event()
+        condition = ConditionWaiter(event, self._verify_config_change_called)
+        condition.start()
+        self.assertTrue(event.wait(1))
+        condition.stop()
+
+    def _on_config_change(self, cfg_type):
+        self._config_change_called = True
+
+    def _verify_config_change_called(self):
+        return self._config_change_called
