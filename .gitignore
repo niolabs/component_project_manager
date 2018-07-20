@@ -15,6 +15,7 @@ __pycache__
 
 # Unit test stuff
 test_results.xml
+.pytest_cache
 
 # Rope Project stuff
 .ropeproject
