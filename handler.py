@@ -7,15 +7,15 @@ import json
 from nio.modules.security.access import ensure_access
 from nio.util.logging import get_nio_logger
 from nio.modules.web import RESTHandler
+from niocore.core.block.cloner import BlockCloner
 
 
 class ProjectManagerHandler(RESTHandler):
     """ Handles 'project' API requests
     """
 
-    def __init__(self, route, block_cloner):
+    def __init__(self, route):
         super().__init__(route)
-        self._block_cloner = block_cloner
         self.logger = get_nio_logger("ProjectManagerHandler")
 
     def on_get(self, request, response, *args, **kwargs):
@@ -48,7 +48,7 @@ class ProjectManagerHandler(RESTHandler):
                 get_branch_info = bool(params.get("branches", 0))
 
                 # -- -- Get block structure
-                result = self._block_cloner.get_blocks_structure(
+                result = BlockCloner.get_blocks_structure(
                     get_branch_info
                 )
 
@@ -80,9 +80,9 @@ class ProjectManagerHandler(RESTHandler):
                 del params["identifier"]
                 # consider url params to be block names,
                 # discard actual url param values
-                blocks = self._block_cloner.get_blocks(params)
+                blocks = BlockCloner.get_blocks(params)
                 if blocks:
-                    result = self._block_cloner.remove_blocks(blocks)
+                    result = BlockCloner.remove_blocks(blocks)
 
         if result is not None:
             response.set_header('Content-Type', 'application/json')
@@ -122,7 +122,7 @@ class ProjectManagerHandler(RESTHandler):
                     branch = body["branch"] if "branch" in body else None
 
                     result = \
-                        self._block_cloner.clone_block(
+                        BlockCloner.clone_block(
                             url, tag, path_to_block, branch
                         )
                 else:
@@ -131,8 +131,8 @@ class ProjectManagerHandler(RESTHandler):
                     # []/project/blocks?twitter&util or
                     # []/project/blocks?twitter,util
                     del params["identifier"]
-                    blocks = self._block_cloner.get_blocks(params)
-                    result = self._block_cloner.update_block(blocks)
+                    blocks = BlockCloner.get_blocks(params)
+                    result = BlockCloner.update_block(blocks)
 
         if result is not None:
             response.set_header('Content-Type', 'application/json')

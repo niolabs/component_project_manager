@@ -6,7 +6,6 @@
 from nio.modules.persistence import Persistence
 from nio.util.versioning.dependency import DependsOn
 from niocore.core.component import CoreComponent
-from niocore.core.block.cloner import BlockCloner
 from nio import discoverable
 
 from .handler import ProjectManagerHandler
@@ -69,8 +68,7 @@ class ProjectManager(CoreComponent):
         super().start()
 
         # create REST specific handlers
-        self._handler = ProjectManagerHandler("/project",
-                                              BlockCloner)
+        self._handler = ProjectManagerHandler("/project")
 
         # Add handler to WebServer
         self._rest_manager.add_web_handler(self._handler)

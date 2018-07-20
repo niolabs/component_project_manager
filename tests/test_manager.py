@@ -1,8 +1,7 @@
 from os import path
 
-from unittest.mock import ANY, patch, Mock
+from unittest.mock import ANY, Mock
 from niocore.core.context import CoreContext
-from nio.modules.persistence import Persistence
 from nio.modules.web import RESTHandler
 from niocore.util.environment import NIOEnvironment
 from niocore.testing.test_case import NIOCoreTestCase

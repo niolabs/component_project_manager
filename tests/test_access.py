@@ -13,7 +13,7 @@ class TestAccess(NIOTestCase):
         """ Asserts that API handlers are protected.
         """
 
-        handler = ProjectManagerHandler(None, None)
+        handler = ProjectManagerHandler("")
         with patch.object(Authorizer, "authorize",
                           side_effect=Unauthorized) as patched_authorize:
 
