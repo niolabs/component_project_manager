@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
+
 from nio.testing.modules.security.module import TestingSecurityModule
 from nio.modules.web.http import Request, Response
 from niocore.core.block.cloner import BlockCloner
@@ -18,16 +19,17 @@ class TestProjectManagerHandler(NIOCoreWebTestCase):
 
     def test_on_get(self):
         project_manager = MagicMock()
-        with patch.object(BlockCloner,
-                          "get_blocks_structure") as get_struct_patch:
-            get_struct_patch.return_value = {}
+        with patch(BlockCloner.__module__ + "._BlockCloner.configured_blocks",
+                        new_callable=PropertyMock) as mock_configured_blocks:
+            mock_configured_blocks.return_value = {}
+
             handler = ProjectManagerHandler("", project_manager)
 
             request = MagicMock(spec=Request)
             request.get_params.return_value = {"identifier": "blocks"}
             response = MagicMock(spec=Response)
             handler.on_get(request, response)
-            self.assertEqual(get_struct_patch.call_count, 1)
+            self.assertEqual(mock_configured_blocks.call_count, 1)
 
         # refresh request
         request = MagicMock(spec=Request)

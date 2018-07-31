@@ -27,7 +27,6 @@ class ProjectManagerHandler(RESTHandler):
         Example:
             Retrieving block structure
                 http://[host]:[port]/project/blocks
-                http://[host]:[port]/project/blocks?branches=1
             Refreshing instance configuration
                 http://[host]:[port]/project/refresh?cfg_type=service
                 http://[host]:[port]/project/refresh?cfg_type=block
@@ -42,16 +41,7 @@ class ProjectManagerHandler(RESTHandler):
 
             # -- Blocks
             if params["identifier"] == "blocks":
-
-                # Ensure instance "read" access in order to retrieve project
-                # blocks structure
-                ensure_access("instance", "read")
-                # -- Get branch info
-                get_branch_info = bool(params.get("branches", 0))
-
-                # -- -- Get block structure
-                result = \
-                    BlockCloner.get_blocks_structure(get_branch_info)
+                result = BlockCloner.configured_blocks
                 if result is not None:
                     response.set_header('Content-Type', 'application/json')
                     response.set_body(json.dumps(result))
