@@ -58,6 +58,14 @@ class ProjectManagerHandler(RESTHandler):
                 else:
                     raise ValueError("GET request with params: {0} is invalid".
                                      format(params))
+            elif params["identifier"] == "blockTypes":
+                result = BlockCloner.configured_blocks
+                if result is not None:
+                    response.set_header('Content-Type', 'application/json')
+                    response.set_body(json.dumps(result))
+                else:
+                    raise ValueError("GET request with params: {0} is invalid".
+                                     format(params))
             # -- Refresh
             elif params["identifier"] == "refresh":
 
