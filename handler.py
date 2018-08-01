@@ -41,6 +41,10 @@ class ProjectManagerHandler(RESTHandler):
 
             # -- Blocks
             if params["identifier"] == "blocks":
+                # Ensure instance "read" access in order to retrieve project
+                # configured blocks
+                ensure_access("instance", "read")
+
                 result = BlockCloner.configured_blocks
                 if result is not None:
                     response.set_header('Content-Type', 'application/json')
