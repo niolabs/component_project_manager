@@ -136,7 +136,8 @@ class ProjectManagerHandler(RESTHandler):
 
                     result = \
                         BlockCloner.clone_block(
-                            url, tag, path_to_block, branch
+                            url, tag, path_to_block, branch,
+                            existing_block_action="update",
                         )
                 else:
                     # when no url is specified, then default to blocks,
